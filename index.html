@@ -1,19 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Book Club Spin Wheel</title>
-
-  <!--
+<!--
     Book Club Spin Wheel - Supabase Version
     ---------------------------------------
 
     This version uses:
       - Netlify or any static host for the webpage
       - Supabase for the shared online book list
-
-    You do NOT need to keep your computer running.
 
     SUPABASE SETUP
     --------------
@@ -76,6 +67,14 @@
     That is okay for a trusted book club, but do not use it for a public website.
   -->
 
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book Club Spin Wheel</title>
+
   <style>
     :root {
       --bg1: #fff7fb;
@@ -95,7 +94,9 @@
       --radius: 30px;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -128,7 +129,7 @@
       letter-spacing: -0.045em;
       line-height: 0.95;
       color: var(--deep);
-      text-shadow: 0 2px 0 rgba(255,255,255,0.85);
+      text-shadow: 0 2px 0 rgba(255, 255, 255, 0.85);
     }
 
     .subtitle {
@@ -146,7 +147,7 @@
       margin-top: 13px;
       padding: 8px 13px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.72);
+      background: rgba(255, 255, 255, 0.72);
       box-shadow: 0 8px 24px rgba(83, 63, 105, 0.08);
       font-size: 0.9rem;
       color: var(--muted);
@@ -159,7 +160,9 @@
       background: #f4b4b4;
     }
 
-    .dot.online { background: #91d7aa; }
+    .dot.online {
+      background: #91d7aa;
+    }
 
     .layout {
       display: grid;
@@ -169,12 +172,14 @@
     }
 
     @media (max-width: 840px) {
-      .layout { grid-template-columns: 1fr; }
+      .layout {
+        grid-template-columns: 1fr;
+      }
     }
 
     .card {
       background: var(--card);
-      border: 1px solid rgba(255,255,255,0.74);
+      border: 1px solid rgba(255, 255, 255, 0.74);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       backdrop-filter: blur(14px);
@@ -242,7 +247,7 @@
       padding: 17px;
       border-radius: 24px;
       text-align: center;
-      background: rgba(255,255,255,0.64);
+      background: rgba(255, 255, 255, 0.64);
       min-height: 82px;
     }
 
@@ -272,7 +277,9 @@
       margin-top: 14px;
     }
 
-    .picked-actions.show { display: flex; }
+    .picked-actions.show {
+      display: flex;
+    }
 
     .small-btn {
       border: 0;
@@ -286,7 +293,7 @@
     }
 
     .small-btn.light {
-      background: rgba(255,255,255,0.78);
+      background: rgba(255, 255, 255, 0.78);
       color: #705f7d;
       box-shadow: none;
     }
@@ -302,25 +309,31 @@
       margin-bottom: 16px;
     }
 
-    input, select {
+    input,
+    select {
       width: 100%;
       border: 1px solid rgba(122, 107, 145, 0.18);
       border-radius: 18px;
       padding: 14px 15px;
       font: inherit;
       color: var(--text);
-      background: rgba(255,255,255,0.84);
+      background: rgba(255, 255, 255, 0.84);
       outline: none;
     }
 
-    input::placeholder { color: #a89bb1; }
+    input::placeholder {
+      color: #a89bb1;
+    }
 
-    input:focus, select:focus {
+    input:focus,
+    select:focus {
       border-color: rgba(201, 182, 242, 0.95);
       box-shadow: 0 0 0 4px rgba(201, 182, 242, 0.18);
     }
 
-    button { font: inherit; }
+    button {
+      font: inherit;
+    }
 
     .primary {
       border: 0;
@@ -343,11 +356,16 @@
       border: 0;
       border-radius: 18px;
       padding: 13px 16px;
-      background: rgba(255,255,255,0.68);
+      background: rgba(255, 255, 255, 0.68);
       color: #705f7d;
       font-weight: 800;
       cursor: pointer;
       margin-top: 10px;
+    }
+
+    .secondary:disabled {
+      opacity: 0.65;
+      cursor: wait;
     }
 
     .section-title {
@@ -371,8 +389,8 @@
       grid-template-columns: 1fr auto;
       gap: 8px;
       align-items: center;
-      background: rgba(255,255,255,0.6);
-      border: 1px solid rgba(255,255,255,0.78);
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.78);
       border-radius: 18px;
       padding: 11px 12px;
     }
@@ -403,7 +421,7 @@
 
     .empty {
       color: var(--muted);
-      background: rgba(255,255,255,0.5);
+      background: rgba(255, 255, 255, 0.5);
       border-radius: 18px;
       padding: 14px;
       text-align: center;
@@ -416,9 +434,13 @@
       line-height: 1.4;
     }
 
-    .name-row, .read-row { margin-bottom: 14px; }
+    .name-row,
+    .read-row {
+      margin-bottom: 14px;
+    }
 
-    .name-row label, .read-row label {
+    .name-row label,
+    .read-row label {
       display: block;
       margin-bottom: 6px;
       color: var(--muted);
@@ -445,7 +467,7 @@
 <body>
   <div class="app">
     <header>
-      <h1>Book Club Wheel</h1>
+      <h1>Bookish Babes Book Club</h1>
       <p class="subtitle">Add book ideas, spin the pastel wheel, and let fate choose the next read.</p>
       <div class="status">
         <span id="statusDot" class="dot"></span>
@@ -492,13 +514,12 @@
             <option>No books read yet</option>
           </select>
           <div id="readCount" class="read-count">0 books moved here</div>
+          <button id="clearReadBtn" class="secondary" type="button">Clear Books Read</button>
         </div>
 
+        <button id="clearActiveBtn" class="secondary" type="button">Clear Current Book List</button>
         <button id="clearLocalBtn" class="secondary" type="button">Clear local books</button>
 
-        <p class="tiny">
-          Everyone using the same hosted page link will see the same book list once Supabase is connected.
-        </p>
       </section>
     </main>
   </div>
@@ -506,15 +527,8 @@
   <script type="module">
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-    /*************************************************************
-     * SUPABASE SETTINGS
-     *
-     * Paste your Supabase Project URL and anon public key here.
-     * Find them in Supabase > Project Settings > API.
-     *************************************************************/
-
-    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
-    const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+    const SUPABASE_URL = "https://rogeqnlbbzcrifuiyhsr.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_TUtkRHF0gz91QOwDdXTNKQ_iwR_PcbN";
 
     const supabaseConfigured =
       SUPABASE_URL &&
@@ -556,6 +570,8 @@
     const statusDot = document.getElementById("statusDot");
     const statusText = document.getElementById("statusText");
     const clearLocalBtn = document.getElementById("clearLocalBtn");
+    const clearReadBtn = document.getElementById("clearReadBtn");
+    const clearActiveBtn = document.getElementById("clearActiveBtn");
 
     let books = [];
     let booksRead = [];
@@ -895,7 +911,7 @@
           renderAll();
         }
 
-        resultTitle.textContent = `"${movingBook.title}" moved to Books Read`;
+        resultTitle.textContent = "Choose your next read";
         pickedBook = null;
         showPickedActions(false);
       } catch (error) {
@@ -1024,6 +1040,73 @@
       renderAll();
     });
 
+    clearReadBtn.addEventListener("click", async () => {
+      if (!confirm("Clear all books from Books Read?")) return;
+
+      clearReadBtn.disabled = true;
+      clearReadBtn.textContent = "Clearing...";
+
+      try {
+        if (onlineReady) {
+          const { error } = await supabase
+            .from("books")
+            .delete()
+            .eq("status", "read");
+
+          if (error) throw error;
+
+          await loadBooks();
+        } else {
+          booksRead = [];
+          saveLocalBooksRead();
+          renderAll();
+        }
+
+        resultTitle.textContent = "Books Read cleared";
+        pickedBook = null;
+        showPickedActions(false);
+      } catch (error) {
+        console.error(error);
+        alert("Could not clear Books Read. Please check your Supabase policies.");
+      } finally {
+        clearReadBtn.disabled = false;
+        clearReadBtn.textContent = "Clear Books Read";
+      }
+    });
+    clearActiveBtn.addEventListener("click", async () => {
+      if (!confirm("Clear all current books from the wheel? This will not clear Books Read.")) return;
+
+      clearActiveBtn.disabled = true;
+      clearActiveBtn.textContent = "Clearing...";
+
+      try {
+        if (onlineReady) {
+          const { error } = await supabase
+            .from("books")
+            .delete()
+            .eq("status", "active");
+
+          if (error) throw error;
+
+          await loadBooks();
+        } else {
+          books = [];
+          saveLocalBooks();
+          renderAll();
+        }
+
+        resultTitle.textContent = "Current book list cleared";
+        pickedBook = null;
+        showPickedActions(false);
+      } catch (error) {
+        console.error(error);
+        alert("Could not clear the current book list. Please check your Supabase policies.");
+      } finally {
+        clearActiveBtn.disabled = false;
+        clearActiveBtn.textContent = "Clear Current Book List";
+      }
+    });
+
     async function init() {
       if (!supabaseConfigured) {
         setStatus(false, "Local mode: add Supabase info in the HTML for sharing");
@@ -1059,4 +1142,5 @@
     init();
   </script>
 </body>
+
 </html>
