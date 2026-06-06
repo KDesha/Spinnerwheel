@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book Club Spin Wheel</title>
+
+  <!--
+    Book Club Spin Wheel - Supabase Version
+    ---------------------------------------
+
+    This version uses:
+      - Netlify or any static host for the webpage
+      - Supabase for the shared online book list
+
+    You do NOT need to keep your computer running.
+
+    SUPABASE SETUP
+    --------------
+    1. Create a free Supabase project.
+    2. Go to Table Editor.
+    3. Create a table named: books
+
+    Columns:
+      id          uuid        primary key, default: gen_random_uuid()
+      title       text        required
+      added_by    text
+      status      text        required, default: active
+      finished_by text
+      created_at  timestamptz default: now()
+      finished_at timestamptz
+
+    Easiest way:
+    Go to Supabase > SQL Editor > New query.
+    Paste this and run it:
+
+    create table if not exists public.books (
+      id uuid primary key default gen_random_uuid(),
+      title text not null,
+      added_by text,
+      status text not null default 'active',
+      finished_by text,
+      created_at timestamptz default now(),
+      finished_at timestamptz
+    );
+
+    alter table public.books enable row level security;
+
+    create policy "Allow public read books"
+    on public.books
+    for select
+    using (true);
+
+    create policy "Allow public insert books"
+    on public.books
+    for insert
+    with check (true);
+
+    create policy "Allow public update books"
+    on public.books
+    for update
+    using (true)
+    with check (true);
+
+    create policy "Allow public delete books"
+    on public.books
+    for delete
+    using (true);
+
+    4. Go to Project Settings > API.
+    5. Copy your Project URL and anon public key.
+    6. Paste them below where it says SUPABASE_URL and SUPABASE_ANON_KEY.
+
+    IMPORTANT:
+    This simple setup lets anyone with the page link add/edit/move/delete books.
+    That is okay for a trusted book club, but do not use it for a public website.
+  -->
+
+  <style>
+    :root {
+      --bg1: #fff7fb;
+      --bg2: #f4f0ff;
+      --bg3: #effaff;
+      --card: rgba(255, 255, 255, 0.78);
+      --text: #4f4560;
+      --muted: #7d728d;
+      --deep: #5f4c70;
+      --pink: #f8b8d7;
+      --purple: #cbb8f8;
+      --blue: #b8e1f8;
+      --mint: #c4ead7;
+      --yellow: #ffe3aa;
+      --peach: #ffc9b5;
+      --shadow: 0 18px 50px rgba(83, 63, 105, 0.17);
+      --radius: 30px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", ui-rounded, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(248, 184, 215, 0.55), transparent 34rem),
+        radial-gradient(circle at bottom right, rgba(184, 225, 248, 0.54), transparent 34rem),
+        radial-gradient(circle at center right, rgba(196, 234, 215, 0.35), transparent 24rem),
+        linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3));
+      padding: 18px;
+    }
+
+    .app {
+      width: min(1060px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin: 16px 0 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.45rem, 9vw, 4.9rem);
+      font-weight: 800;
+      letter-spacing: -0.045em;
+      line-height: 0.95;
+      color: var(--deep);
+      text-shadow: 0 2px 0 rgba(255,255,255,0.85);
+    }
+
+    .subtitle {
+      margin: 12px auto 0;
+      max-width: 650px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 1.03rem;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 13px;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.72);
+      box-shadow: 0 8px 24px rgba(83, 63, 105, 0.08);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #f4b4b4;
+    }
+
+    .dot.online { background: #91d7aa; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 840px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.74);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      padding: clamp(16px, 4vw, 26px);
+    }
+
+    .wheel-wrap {
+      position: relative;
+      width: min(520px, 100%);
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+      display: grid;
+      place-items: center;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 16px 30px rgba(83, 63, 105, 0.16));
+      border-radius: 50%;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 42px solid #fff;
+      filter: drop-shadow(0 5px 8px rgba(83, 63, 105, 0.22));
+      z-index: 3;
+    }
+
+    .center-button {
+      position: absolute;
+      width: 118px;
+      height: 118px;
+      border: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffffff, #fff0f8);
+      color: #6e587b;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      font-size: 1.03rem;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(83, 63, 105, 0.22);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .center-button:active {
+      transform: scale(0.96);
+      box-shadow: 0 8px 18px rgba(83, 63, 105, 0.2);
+    }
+
+    .center-button:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    .result {
+      margin-top: 18px;
+      padding: 17px;
+      border-radius: 24px;
+      text-align: center;
+      background: rgba(255,255,255,0.64);
+      min-height: 82px;
+    }
+
+    .result-label {
+      color: var(--muted);
+      font-size: 0.86rem;
+      margin-bottom: 6px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .result-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.45rem, 5vw, 2.25rem);
+      font-weight: 800;
+      color: #695478;
+      word-break: break-word;
+      line-height: 1.08;
+    }
+
+    .picked-actions {
+      display: none;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .picked-actions.show { display: flex; }
+
+    .small-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 15px;
+      font-weight: 850;
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      box-shadow: 0 10px 20px rgba(160, 117, 178, 0.18);
+    }
+
+    .small-btn.light {
+      background: rgba(255,255,255,0.78);
+      color: #705f7d;
+      box-shadow: none;
+    }
+
+    .small-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .form {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid rgba(122, 107, 145, 0.18);
+      border-radius: 18px;
+      padding: 14px 15px;
+      font: inherit;
+      color: var(--text);
+      background: rgba(255,255,255,0.84);
+      outline: none;
+    }
+
+    input::placeholder { color: #a89bb1; }
+
+    input:focus, select:focus {
+      border-color: rgba(201, 182, 242, 0.95);
+      box-shadow: 0 0 0 4px rgba(201, 182, 242, 0.18);
+    }
+
+    button { font: inherit; }
+
+    .primary {
+      border: 0;
+      border-radius: 18px;
+      padding: 0 16px;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      color: #fff;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(160, 117, 178, 0.22);
+    }
+
+    .primary:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .secondary {
+      width: 100%;
+      border: 0;
+      border-radius: 18px;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.68);
+      color: #705f7d;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.55rem;
+      color: var(--deep);
+      letter-spacing: -0.02em;
+    }
+
+    .book-list {
+      display: grid;
+      gap: 9px;
+      max-height: 335px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .book {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.78);
+      border-radius: 18px;
+      padding: 11px 12px;
+    }
+
+    .book-title {
+      font-weight: 850;
+      overflow-wrap: anywhere;
+      color: #5b4b67;
+      line-height: 1.2;
+    }
+
+    .book-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .delete {
+      border: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.82);
+      color: #9b6c7c;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .empty {
+      color: var(--muted);
+      background: rgba(255,255,255,0.5);
+      border-radius: 18px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .tiny {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .name-row, .read-row { margin-bottom: 14px; }
+
+    .name-row label, .read-row label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .read-row {
+      margin-top: 18px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(122, 107, 145, 0.13);
+    }
+
+    .read-count {
+      color: var(--muted);
+      font-size: 0.84rem;
+      margin-top: 7px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <h1>Book Club Wheel</h1>
+      <p class="subtitle">Add book ideas, spin the pastel wheel, and let fate choose the next read.</p>
+      <div class="status">
+        <span id="statusDot" class="dot"></span>
+        <span id="statusText">Add your Supabase info in the HTML file</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <div class="wheel-wrap">
+          <div class="pointer"></div>
+          <canvas id="wheel" width="1000" height="1000" aria-label="Book spin wheel"></canvas>
+          <button id="spinBtn" class="center-button">SPIN</button>
+        </div>
+
+        <div class="result">
+          <div class="result-label">Selected book</div>
+          <div id="resultTitle" class="result-title">Add books to start</div>
+          <div id="pickedActions" class="picked-actions">
+            <button id="markReadBtn" class="small-btn" type="button">Move to Books Read</button>
+            <button id="keepBookBtn" class="small-btn light" type="button">Keep on Wheel</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="section-title">Book List</h2>
+
+        <div class="name-row">
+          <label for="personName">Your name</label>
+          <input id="personName" placeholder="Example: Kayla" autocomplete="name" />
+        </div>
+
+        <form id="bookForm" class="form">
+          <input id="bookInput" placeholder="Add a book title..." autocomplete="off" required />
+          <button id="addBtn" class="primary" type="submit">Add</button>
+        </form>
+
+        <div id="bookList" class="book-list"></div>
+
+        <div class="read-row">
+          <label for="booksReadSelect">Books Read</label>
+          <select id="booksReadSelect">
+            <option>No books read yet</option>
+          </select>
+          <div id="readCount" class="read-count">0 books moved here</div>
+        </div>
+
+        <button id="clearLocalBtn" class="secondary" type="button">Clear local books</button>
+
+        <p class="tiny">
+          Everyone using the same hosted page link will see the same book list once Supabase is connected.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    /*************************************************************
+     * SUPABASE SETTINGS
+     *
+     * Paste your Supabase Project URL and anon public key here.
+     * Find them in Supabase > Project Settings > API.
+     *************************************************************/
+
+    const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+
+    const supabaseConfigured =
+      SUPABASE_URL &&
+      SUPABASE_ANON_KEY &&
+      !SUPABASE_URL.includes("PASTE_YOUR") &&
+      !SUPABASE_ANON_KEY.includes("PASTE_YOUR");
+
+    const supabase = supabaseConfigured
+      ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      : null;
+
+    const pastelColors = [
+      "#f8b8d7", "#cbb8f8", "#b8e1f8", "#c4ead7",
+      "#ffe3aa", "#ffc9b5", "#dccbff", "#ccf3e3",
+      "#ffd8eb", "#cce9ff", "#f8d9bd", "#eadcff"
+    ];
+
+    const sampleBooks = [
+      { id: "sample-1", title: "The Very Secret Society of Irregular Witches", added_by: "Sample", status: "active", created_at: new Date().toISOString() },
+      { id: "sample-2", title: "Book Lovers", added_by: "Sample", status: "active", created_at: new Date().toISOString() },
+      { id: "sample-3", title: "The House in the Cerulean Sea", added_by: "Sample", status: "active", created_at: new Date().toISOString() },
+      { id: "sample-4", title: "Remarkably Bright Creatures", added_by: "Sample", status: "active", created_at: new Date().toISOString() }
+    ];
+
+    const wheel = document.getElementById("wheel");
+    const ctx = wheel.getContext("2d");
+    const spinBtn = document.getElementById("spinBtn");
+    const resultTitle = document.getElementById("resultTitle");
+    const pickedActions = document.getElementById("pickedActions");
+    const markReadBtn = document.getElementById("markReadBtn");
+    const keepBookBtn = document.getElementById("keepBookBtn");
+    const bookForm = document.getElementById("bookForm");
+    const bookInput = document.getElementById("bookInput");
+    const addBtn = document.getElementById("addBtn");
+    const bookList = document.getElementById("bookList");
+    const personName = document.getElementById("personName");
+    const booksReadSelect = document.getElementById("booksReadSelect");
+    const readCount = document.getElementById("readCount");
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const clearLocalBtn = document.getElementById("clearLocalBtn");
+
+    let books = [];
+    let booksRead = [];
+    let rotation = 0;
+    let isSpinning = false;
+    let pickedBook = null;
+    let onlineReady = false;
+
+    personName.value = localStorage.getItem("bookWheelName") || "";
+    personName.addEventListener("input", () => {
+      localStorage.setItem("bookWheelName", personName.value.trim());
+    });
+
+    function getSavedBooks() {
+      const saved = localStorage.getItem("bookWheelBooks");
+      if (saved) return JSON.parse(saved);
+      localStorage.setItem("bookWheelBooks", JSON.stringify(sampleBooks));
+      return sampleBooks;
+    }
+
+    function getSavedBooksRead() {
+      const saved = localStorage.getItem("bookWheelBooksRead");
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    function saveLocalBooks() {
+      localStorage.setItem("bookWheelBooks", JSON.stringify(books));
+    }
+
+    function saveLocalBooksRead() {
+      localStorage.setItem("bookWheelBooksRead", JSON.stringify(booksRead));
+    }
+
+    function setStatus(isOnline, message) {
+      onlineReady = isOnline;
+      statusDot.classList.toggle("online", isOnline);
+      statusText.textContent = message || (isOnline
+        ? "Supabase connected: shared with everyone"
+        : "Local mode: saved only on this device");
+      clearLocalBtn.style.display = isOnline ? "none" : "block";
+    }
+
+    function showPickedActions(show) {
+      pickedActions.classList.toggle("show", show);
+    }
+
+    function normalizeBook(book) {
+      return {
+        id: book.id,
+        title: book.title || "Untitled book",
+        added_by: book.added_by || book.addedBy || "Someone",
+        status: book.status || "active",
+        finished_by: book.finished_by || book.finishedBy || "",
+        created_at: book.created_at || new Date().toISOString(),
+        finished_at: book.finished_at || ""
+      };
+    }
+
+    function renderList() {
+      if (!books.length) {
+        bookList.innerHTML = `<div class="empty">No books yet. Add your first one!</div>`;
+        return;
+      }
+
+      const sorted = [...books].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+
+      bookList.innerHTML = sorted.map(book => `
+        <div class="book">
+          <div>
+            <div class="book-title">${escapeHtml(book.title)}</div>
+            <div class="book-meta">Added by ${escapeHtml(book.added_by || "Someone")}</div>
+          </div>
+          <button class="delete" type="button" data-id="${book.id}" aria-label="Remove ${escapeHtml(book.title)}">×</button>
+        </div>
+      `).join("");
+
+      document.querySelectorAll(".delete").forEach(btn => {
+        btn.addEventListener("click", () => removeBook(btn.dataset.id));
+      });
+    }
+
+    function renderBooksRead() {
+      const sorted = [...booksRead].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+
+      if (!sorted.length) {
+        booksReadSelect.innerHTML = `<option>No books read yet</option>`;
+        readCount.textContent = "0 books moved here";
+        return;
+      }
+
+      booksReadSelect.innerHTML = sorted.map(book => `
+        <option>${escapeHtml(book.title)}${book.finished_by ? " — moved by " + escapeHtml(book.finished_by) : ""}</option>
+      `).join("");
+
+      readCount.textContent = `${sorted.length} ${sorted.length === 1 ? "book" : "books"} moved here`;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function drawWheel() {
+      const size = wheel.width;
+      const radius = size / 2;
+      const center = radius;
+
+      ctx.clearRect(0, 0, size, size);
+
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(rotation);
+
+      if (!books.length) {
+        ctx.beginPath();
+        ctx.arc(0, 0, radius - 20, 0, Math.PI * 2);
+        ctx.fillStyle = "#f4eaff";
+        ctx.fill();
+
+        ctx.fillStyle = "#746481";
+        ctx.font = "bold 52px Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Add books", 0, -14);
+        ctx.font = "31px Trebuchet MS, system-ui";
+        ctx.fillStyle = "#9589a3";
+        ctx.fillText("then spin!", 0, 44);
+
+        ctx.restore();
+        return;
+      }
+
+      const slice = (Math.PI * 2) / books.length;
+
+      books.forEach((book, index) => {
+        const start = index * slice;
+        const end = start + slice;
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius - 20, start, end);
+        ctx.closePath();
+        ctx.fillStyle = pastelColors[index % pastelColors.length];
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.84)";
+        ctx.lineWidth = books.length > 24 ? 4 : 7;
+        ctx.stroke();
+
+        drawBookLabel(book.title, start, slice, radius);
+      });
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 76, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.84)";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawBookLabel(title, start, slice, radius) {
+      const middle = start + slice / 2;
+      const availableWidth = Math.max(118, radius - 172);
+      const fontSize = getFontSize();
+
+      ctx.save();
+      ctx.rotate(middle);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#55435f";
+      ctx.font = `900 ${fontSize}px Trebuchet MS, Segoe UI, system-ui`;
+
+      const maxLines = books.length <= 8 ? 2 : 1;
+      const lines = wrapText(title, availableWidth, maxLines);
+
+      const lineHeight = fontSize * 1.04;
+      const startY = maxLines === 2 && lines.length === 2 ? -lineHeight / 2 : 0;
+
+      lines.forEach((line, i) => {
+        ctx.fillText(line, radius - 54, startY + i * lineHeight);
+      });
+
+      ctx.restore();
+    }
+
+    function getFontSize() {
+      if (books.length <= 6) return 31;
+      if (books.length <= 10) return 27;
+      if (books.length <= 16) return 23;
+      if (books.length <= 24) return 19;
+      return 15;
+    }
+
+    function wrapText(text, maxWidth, maxLines) {
+      const clean = String(text).trim();
+      const words = clean.split(/\s+/);
+      const lines = [];
+      let current = "";
+
+      for (const word of words) {
+        const test = current ? current + " " + word : word;
+        if (ctx.measureText(test).width <= maxWidth) {
+          current = test;
+        } else {
+          if (current) lines.push(current);
+          current = word;
+          if (lines.length === maxLines) break;
+        }
+      }
+
+      if (current && lines.length < maxLines) lines.push(current);
+      if (!lines.length) lines.push(clean);
+
+      const allLinesText = lines.join(" ");
+      if (allLinesText.length < clean.length || ctx.measureText(lines[lines.length - 1]).width > maxWidth) {
+        lines[lines.length - 1] = shrinkWithEllipsis(lines[lines.length - 1], maxWidth);
+      }
+
+      return lines;
+    }
+
+    function shrinkWithEllipsis(text, maxWidth) {
+      let shortened = String(text);
+      while (shortened.length > 1 && ctx.measureText(shortened + "…").width > maxWidth) {
+        shortened = shortened.slice(0, -1);
+      }
+      return shortened + "…";
+    }
+
+    async function loadBooks() {
+      if (!onlineReady) {
+        books = getSavedBooks().filter(book => (book.status || "active") === "active").map(normalizeBook);
+        booksRead = getSavedBooksRead().map(normalizeBook);
+        renderAll();
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("books")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      const allBooks = (data || []).map(normalizeBook);
+      books = allBooks.filter(book => book.status === "active");
+      booksRead = allBooks.filter(book => book.status === "read");
+
+      if (pickedBook && !books.some(book => book.id === pickedBook.id)) {
+        pickedBook = null;
+        showPickedActions(false);
+      }
+
+      renderAll();
+    }
+
+    async function addBook(title) {
+      const cleanTitle = title.trim();
+      if (!cleanTitle) return;
+
+      const newBook = {
+        title: cleanTitle,
+        added_by: personName.value.trim() || "Someone",
+        status: "active"
+      };
+
+      if (onlineReady) {
+        const { error } = await supabase.from("books").insert(newBook);
+        if (error) throw error;
+        await loadBooks();
+      } else {
+        books.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+          created_at: new Date().toISOString(),
+          ...newBook
+        });
+        saveLocalBooks();
+        renderAll();
+      }
+    }
+
+    async function removeBook(id) {
+      if (onlineReady) {
+        const { error } = await supabase.from("books").delete().eq("id", id);
+        if (error) throw error;
+        await loadBooks();
+      } else {
+        books = books.filter(book => book.id !== id);
+        saveLocalBooks();
+        renderAll();
+      }
+
+      if (pickedBook && pickedBook.id === id) {
+        pickedBook = null;
+        showPickedActions(false);
+      }
+    }
+
+    async function movePickedBookToRead() {
+      if (!pickedBook) return;
+
+      const movingBook = { ...pickedBook };
+      const finishedBy = personName.value.trim() || "Someone";
+
+      markReadBtn.disabled = true;
+      markReadBtn.textContent = "Moving...";
+
+      try {
+        if (onlineReady) {
+          const { error } = await supabase
+            .from("books")
+            .update({
+              status: "read",
+              finished_by: finishedBy,
+              finished_at: new Date().toISOString()
+            })
+            .eq("id", movingBook.id);
+
+          if (error) throw error;
+          await loadBooks();
+        } else {
+          booksRead.push({
+            ...movingBook,
+            status: "read",
+            finished_by: finishedBy,
+            finished_at: new Date().toISOString()
+          });
+
+          books = books.filter(book => book.id !== movingBook.id);
+          saveLocalBooks();
+          saveLocalBooksRead();
+          renderAll();
+        }
+
+        resultTitle.textContent = `"${movingBook.title}" moved to Books Read`;
+        pickedBook = null;
+        showPickedActions(false);
+      } catch (error) {
+        console.error(error);
+        alert("It could not move the book. Please check your Supabase table and policies.");
+      } finally {
+        markReadBtn.disabled = false;
+        markReadBtn.textContent = "Move to Books Read";
+      }
+    }
+
+    function renderAll() {
+      drawWheel();
+      renderList();
+      renderBooksRead();
+
+      if (!books.length && !pickedBook) {
+        resultTitle.textContent = "Add books to start";
+        showPickedActions(false);
+      }
+    }
+
+    function spin() {
+      if (isSpinning || books.length < 2) {
+        if (books.length === 1) {
+          pickedBook = books[0];
+          resultTitle.textContent = books[0].title;
+          showPickedActions(true);
+        }
+        return;
+      }
+
+      isSpinning = true;
+      spinBtn.disabled = true;
+      pickedBook = null;
+      showPickedActions(false);
+      resultTitle.textContent = "Spinning...";
+
+      const winningIndex = Math.floor(Math.random() * books.length);
+      const slice = (Math.PI * 2) / books.length;
+
+      const pointerAngle = -Math.PI / 2;
+      const winningSliceCenter = winningIndex * slice + slice / 2;
+
+      const currentFullRotations = rotation % (Math.PI * 2);
+      const targetRotation = pointerAngle - winningSliceCenter;
+      const extraSpins = Math.PI * 2 * (5 + Math.floor(Math.random() * 3));
+      const finalRotation = rotation + extraSpins + normalizeAngle(targetRotation - currentFullRotations);
+
+      const startRotation = rotation;
+      const change = finalRotation - startRotation;
+      const duration = 4300;
+      const startTime = performance.now();
+
+      function animate(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 4);
+
+        rotation = startRotation + change * eased;
+        drawWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          rotation = finalRotation;
+          drawWheel();
+          pickedBook = books[winningIndex];
+          resultTitle.textContent = pickedBook.title;
+          showPickedActions(true);
+          isSpinning = false;
+          spinBtn.disabled = false;
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function normalizeAngle(angle) {
+      const twoPi = Math.PI * 2;
+      return ((angle % twoPi) + twoPi) % twoPi;
+    }
+
+    bookForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const titleToAdd = bookInput.value.trim();
+      if (!titleToAdd) return;
+
+      bookInput.value = "";
+      bookInput.focus();
+      addBtn.disabled = true;
+      addBtn.textContent = "Adding...";
+
+      try {
+        await addBook(titleToAdd);
+      } catch (error) {
+        console.error(error);
+        alert("The book could not be added. Please check your Supabase setup.");
+        bookInput.value = titleToAdd;
+        bookInput.focus();
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = "Add";
+      }
+    });
+
+    spinBtn.addEventListener("click", spin);
+
+    markReadBtn.addEventListener("click", movePickedBookToRead);
+
+    keepBookBtn.addEventListener("click", () => {
+      pickedBook = null;
+      showPickedActions(false);
+      resultTitle.textContent = "Kept on the wheel";
+    });
+
+    clearLocalBtn.addEventListener("click", () => {
+      if (onlineReady) return;
+      if (!confirm("Clear all books and books read saved on this device?")) return;
+      books = [];
+      booksRead = [];
+      pickedBook = null;
+      saveLocalBooks();
+      saveLocalBooksRead();
+      renderAll();
+    });
+
+    async function init() {
+      if (!supabaseConfigured) {
+        setStatus(false, "Local mode: add Supabase info in the HTML for sharing");
+        books = getSavedBooks().map(normalizeBook);
+        booksRead = getSavedBooksRead().map(normalizeBook);
+        renderAll();
+        return;
+      }
+
+      try {
+        setStatus(true, "Connecting to Supabase...");
+        await loadBooks();
+        setStatus(true, "Supabase connected: shared with everyone");
+
+        supabase
+          .channel("books-changes")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "books" },
+            () => loadBooks()
+          )
+          .subscribe();
+      } catch (error) {
+        console.error(error);
+        setStatus(false, "Could not connect: using local mode");
+        books = getSavedBooks().map(normalizeBook);
+        booksRead = getSavedBooksRead().map(normalizeBook);
+        renderAll();
+        alert("Supabase could not connect. Check your Project URL, anon key, table name, and policies.");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
