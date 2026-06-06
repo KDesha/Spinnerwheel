@@ -1,6 +1,6 @@
 # Book Club Spin Wheel
 
-A simple pastel book-club spin wheel that lets everyone add book ideas, spin for the next read, and move finished picks into a “Books Read” list.
+A simple spin wheel that lets everyone add book ideas, spin for the next read, and move finished picks into a “Books Read” list.
 
 This version is designed to be hosted on GitHub Pages and connected to Supabase for the shared online book list.
 
