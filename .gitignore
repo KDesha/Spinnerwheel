@@ -1,0 +1,15 @@
+.DS_Store
+node_modules/
+www/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+GoogleAPI.pages
+supabase/.temp/
+README-v*.txt
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.ipa
+*.xcarchive/

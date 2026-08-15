@@ -1,0 +1,25 @@
+{
+  "name": "spines-and-spins",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A whimsical book-club spinner for iOS and Android.",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "serve": "python3 -m http.server 4189 --bind 127.0.0.1 --directory www",
+    "release:check": "npm run build:web && node --check app-v2.js && node scripts/release-check.mjs",
+    "sync:ios": "npm run build:web && npx cap sync ios",
+    "open:ios": "npm run sync:ios && npx cap open ios",
+    "run:ios": "npm run sync:ios && npx cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/status-bar": "^8.0.3",
+    "@revenuecat/purchases-capacitor": "^13.4.0",
+    "@supabase/supabase-js": "^2.112.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "supabase": "^2.114.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Spines & Spins",
+  "short_name": "Spines & Spins",
+  "description": "Where book clubs find their next adventure.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#160909",
+  "theme_color": "#6f2635"
+}

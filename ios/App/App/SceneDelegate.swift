@@ -1,0 +1,37 @@
+import UIKit
+import Capacitor
+
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+    var window: UIWindow?
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+
+        let appBackground = UIColor(
+            red: 8.0 / 255.0,
+            green: 5.0 / 255.0,
+            blue: 4.0 / 255.0,
+            alpha: 1.0
+        )
+        let bridgeViewController = CAPBridgeViewController()
+
+        window = UIWindow(windowScene: windowScene)
+        window?.backgroundColor = appBackground
+        bridgeViewController.view.backgroundColor = appBackground
+        bridgeViewController.webView?.isOpaque = false
+        bridgeViewController.webView?.backgroundColor = appBackground
+        bridgeViewController.webView?.scrollView.backgroundColor = appBackground
+        window?.rootViewController = bridgeViewController
+        window?.makeKeyAndVisible()
+
+        SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        SceneDelegateProxy.shared.scene(scene, continue: userActivity)
+    }
+}

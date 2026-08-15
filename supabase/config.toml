@@ -1,0 +1,8 @@
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.book-catalog]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
