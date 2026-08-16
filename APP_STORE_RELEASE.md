@@ -31,21 +31,21 @@ supabase functions deploy revenuecat-webhook --no-verify-jwt
 
 Review `public.content_reports` at least daily while the user base is small. Respond promptly, remove violating content, and document the action. This operational step is part of Apple’s user-generated-content requirement.
 
-## 3. RevenueCat and subscriptions — complete
+## 3. RevenueCat and subscriptions — submitted
 
-RevenueCat app `appb44aab6308`, offering `spines_and_spins`, all products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. All three products show **Ready to Submit** in RevenueCat. Their App Store subscription group and products are in the draft review submission.
+RevenueCat app `appb44aab6308`, offering `spines_and_spins`, all products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. The subscription group and all three products—Library Legend Monthly, Shelf Enchanter Monthly, and Story Spinner Monthly—were submitted with iOS version 1.0 on August 16, 2026. Apple currently shows all of them as **Waiting for Review**.
 
-Before final submission, test purchase, cancellation, renewal, expiration, upgrade, downgrade, and Restore Purchases with an Apple sandbox account on a physical device.
+Before manually releasing the approved version, test purchase, cancellation, renewal, expiration, upgrade, downgrade, and Restore Purchases with an Apple sandbox account on a physical device.
 
-## 4. Public store URLs
+## 4. Public store URLs — live
 
-These URLs are prepared but currently return 404 because GitHub Pages has not been enabled:
+GitHub Pages is enabled from the repository's `main` branch. These public URLs were verified to return HTTP 200 before submission:
 
 - Privacy Policy: `https://kdesha.github.io/Spinnerwheel/privacy.html`
 - Support URL: `https://kdesha.github.io/Spinnerwheel/support.html`
 - Terms: `https://kdesha.github.io/Spinnerwheel/terms.html`
 
-Open each public URL in a private browser before submission. Apple rejects placeholder, broken, or access-controlled policy and support pages.
+The support and marketing URLs are saved on version 1.0, and the privacy-policy URL is published in App Privacy.
 
 ## 5. App Store Connect
 
@@ -56,11 +56,12 @@ Open each public URL in a private browser before submission. Apple rejects place
 - App icon: `app-store-assets/app-icon-1024.png` (1024×1024 RGB, no transparency), bundled through the iOS AppIcon asset catalog.
 - Export compliance: the app declares that it does not use non-exempt encryption.
 - Age rating: answer for user-generated content and unrestricted web links accurately; do not place the app in the Kids category.
-- App Privacy draft discloses email address, name, user ID, emails/text messages, other user content, audio data, purchase history, and product interaction as linked to the user for app functionality; no tracking and no advertising. It still needs its public privacy-policy URL and the final **Publish** action.
+- App Privacy is published. It discloses email address, name, user ID, emails/text messages, other user content, audio data, purchase history, and product interaction as linked to the user for app functionality; no tracking and no advertising.
 - Review notes should explain Google Books/Open Library metadata, optional plain Amazon search, microphone use only for user-initiated voice notes, report/block controls, account deletion, subscriptions, and Restore Purchases.
 - A durable demo account is confirmed and populated with a private review club, The Hobbit, 19 chapters, a current reading room, and a sample chapter warning/rating. Its credentials are saved in App Store Connect.
-- The app is set to Free, public distribution, all 175 countries or regions, and manual release after approval.
-- Content Rights still requires the account holder's legal attestation that the app has the necessary rights to access third-party book metadata and cover content.
+- The app is set to Free, public distribution in 174 countries or regions, and manual release after approval. China mainland is excluded; App Store Connect shows its removal as processing.
+- Content Rights is complete with the account holder's attestation that the app has the necessary rights to access its third-party content.
+- App Review submission `9803b2e0-240b-4f89-adc1-b4abe24c26f3` includes five items: iOS version 1.0 build 3, the Spines & Spins Membership subscription group, and all three monthly subscriptions. Every item is **Waiting for Review** as of August 16, 2026.
 
 ## 6. Final commands
 
@@ -70,6 +71,6 @@ npm run release:check
 npm run sync:ios
 ```
 
-These checks passed, including a Release simulator build, build 3 device archive, valid Apple Distribution signature, the embedded `Spines and Spins App Store 2026` provisioning profile, App Store Connect upload validation, and build processing. Build 3 is attached to version 1.0. Complete TestFlight device testing, the public URL/privacy publication, the Content Rights attestation, and submit the app plus its subscriptions together.
+These checks passed, including a Release simulator build, build 3 device archive, valid Apple Distribution signature, the embedded `Spines and Spins App Store 2026` provisioning profile, App Store Connect upload validation, and build processing. Build 3 is attached to version 1.0 and was submitted with its subscription group and three products. The release remains manual, so approval will not publish the app until the account holder chooses to release it.
 
 Amazon Associates is not required. The app intentionally generates a normal Amazon search URL without an affiliate tag and does not claim an affiliate relationship.
