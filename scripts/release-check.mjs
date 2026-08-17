@@ -56,6 +56,13 @@ try {
   errors.push("Run npm run build:web to create www/vendor/supabase.js");
 }
 
+try {
+  await access(path.join(root, "vendor", "supabase.js"));
+  passes.push("GitHub Pages Supabase browser bundle exists");
+} catch (_) {
+  errors.push("Run npm run build:web to create vendor/supabase.js for GitHub Pages");
+}
+
 warnings.push("Deploy both Supabase migrations and all three Edge Functions before review.");
 warnings.push("Set the GOOGLE_BOOKS_API_KEY Edge Function secret to a newly rotated key restricted to the Books API.");
 warnings.push("Confirm App Store Connect privacy answers match ios/App/App/PrivacyInfo.xcprivacy and privacy.html.");

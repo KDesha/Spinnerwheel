@@ -1,7 +1,14 @@
 const SUPABASE_URL = "https://rogeqnlbbzcrifuiyhsr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_TUtkRHF0gz91QOwDdXTNKQ_iwR_PcbN";
+const PUBLIC_WEB_APP_URL = "https://kdesha.github.io/Spinnerwheel/";
 const APPLE_SUBSCRIPTIONS_URL = "https://apps.apple.com/account/subscriptions";
 const APPLE_STANDARD_EULA_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const AUTH_ATTEMPT_STORAGE_KEY = "spinesAndSpinsAuthAttemptGuard";
+const PASSWORD_RESET_STORAGE_KEY = "spinesAndSpinsPasswordResetGuard";
+const SIGN_IN_FAILURE_LIMIT = 3;
+const SIGN_IN_COOLDOWN_MS = 30_000;
+const RATE_LIMIT_COOLDOWN_MS = 60_000;
+const PASSWORD_RESET_COOLDOWN_MS = 60_000;
 
 // Filled when the native Capacitor shell is created. RevenueCat public SDK
 // keys are safe to ship in the app; secret keys belong only in Edge Functions.
@@ -118,6 +125,116 @@ const escapeHtml = value =>
     "\"": "&quot;"
   }[char]));
 
+let bookNoticeChain = Promise.resolve();
+
+function friendlyNoticeMessage(value) {
+  const message = String(value || "Something unexpected interrupted this chapter.").trim();
+  const lower = message.toLowerCase();
+
+  if (lower.includes("invalid login credentials") || lower.includes("invalid_credentials")) {
+    return "That email and password do not match our shelves. Check them and try again, or use Forgot your password below.";
+  }
+
+  if (lower.includes("email not confirmed")) {
+    return "Your email still needs to be confirmed. Open the newest Spines & Spins email, then come back and sign in.";
+  }
+
+  if (lower.includes("user already registered")) {
+    return "That email already has a place on our shelves. Sign in instead, or reset the password if you need a fresh key.";
+  }
+
+  if (lower.includes("rate limit") || lower.includes("too many requests") || lower.includes("over_email_send_rate_limit")) {
+    return "Too many requests reached the library at once. Please wait about a minute, check for the newest email, and then try again.";
+  }
+
+  if (lower.includes("failed to fetch") || lower.includes("network request failed")) {
+    return "We could not reach the reading room. Check your connection and try turning the page again.";
+  }
+
+  if (lower.includes("otp_expired") || lower.includes("token has expired") || lower.includes("invalid token")) {
+    return "That password-reset link has expired. Return to sign in and request a new one.";
+  }
+
+  return message;
+}
+
+function noticePresentation(message) {
+  const lower = message.toLowerCase();
+  const success = /\b(sent|saved|updated|ready|restored|complete|success)\b/.test(lower);
+  const needsAttention = /\b(error|failed|invalid|cannot|can't|could not|do not|does not|match|missing|please|too many|unavailable|expired|required)\b/.test(lower);
+
+  if (success) {
+    return {
+      tone: "success",
+      title: "A new chapter begins",
+      comment: "Your bookmark is in place. The next page is ready when you are."
+    };
+  }
+
+  if (needsAttention) {
+    return {
+      tone: "attention",
+      title: "A little plot twist",
+      comment: "Even the best stories hit a snag. We can smooth this page and try again."
+    };
+  }
+
+  return {
+    tone: "note",
+    title: "A note from the shelves",
+    comment: "One page at a time—your reading world will be waiting for you."
+  };
+}
+
+function openBookNotice(value) {
+  return new Promise(resolve => {
+    const message = friendlyNoticeMessage(value);
+    const presentation = noticePresentation(message);
+    const id = `bookNotice${Date.now()}${Math.random().toString(16).slice(2)}`;
+
+    document.body.insertAdjacentHTML("beforeend", `
+      <dialog class="book-dialog book-notice-dialog notice-${presentation.tone}" id="${id}" aria-labelledby="${id}Title">
+        <div class="dialog-card book-notice-card">
+          <button class="dialog-close" type="button" aria-label="Close">×</button>
+          <div class="book-notice-icon" aria-hidden="true"><span></span><span></span></div>
+          <p class="eyebrow">From the reading room</p>
+          <h2 id="${id}Title">${escapeHtml(presentation.title)}</h2>
+          <p class="book-notice-message">${escapeHtml(message)}</p>
+          <p class="book-notice-comment"><span aria-hidden="true">“</span>${escapeHtml(presentation.comment)}</p>
+          <button class="primary-button" type="button" data-notice-close>Turn the page</button>
+        </div>
+      </dialog>
+    `);
+
+    const dialog = document.getElementById(id);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      dialog.close();
+      dialog.remove();
+      resolve();
+    };
+
+    dialog.showModal();
+    $(".dialog-close", dialog).onclick = finish;
+    $("[data-notice-close]", dialog).onclick = finish;
+    dialog.addEventListener("cancel", event => {
+      event.preventDefault();
+      finish();
+    });
+    $("[data-notice-close]", dialog).focus();
+  });
+}
+
+// Replace browser-native alerts with an accessible, on-brand notice. Existing
+// call sites may return this Promise, so queued notices never overlap.
+function alert(message) {
+  const nextNotice = bookNoticeChain.then(() => openBookNotice(message));
+  bookNoticeChain = nextNotice.catch(() => {});
+  return nextNotice;
+}
+
 const route = document.body.dataset.page || "home";
 const getParam = key => new URLSearchParams(location.search).get(key);
 
@@ -171,6 +288,16 @@ async function initialize() {
     ? getParam("preview")
     : "";
   if (localPreview) {
+    if (localPreview === "auth" || localPreview === "notice") {
+      user = null;
+      profile = null;
+      currentClub = null;
+      updateNav();
+      if (localPreview === "auth") openAuthDialog();
+      if (localPreview === "notice") alert("That email and password do not match our shelves. Check them and try again, or use Forgot your password below.");
+      return;
+    }
+
     user = { id: "00000000-0000-4000-8000-000000000001", email: "reader@example.com" };
     profile = { id: user.id, display_name: "Preview Reader", subscription_tier: "first_chapter" };
     currentClub = { id: "preview-club", name: "Midnight Margins", membership: { role: "owner" } };
@@ -205,6 +332,10 @@ async function initialize() {
       }
     }
     return;
+  }
+
+  if (getParam("passwordReset") === "complete") {
+    setTimeout(() => alert("Your password has been updated. You can close this page, return to the Spines & Spins app, and sign in with your new password."), 0);
   }
 
   initSupabase();
@@ -733,27 +864,93 @@ async function waitForSubscriptionProfile(expectedTier, attempts = 8) {
   return false;
 }
 
-function authRedirectUrl() {
-  return new URL("club.html", window.location.href).href;
+function readAuthGuard(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "{}") || {};
+  } catch (_) {
+    localStorage.removeItem(key);
+    return {};
+  }
+}
+
+function cooldownSeconds(key) {
+  const guard = readAuthGuard(key);
+  return Math.max(0, Math.ceil((Number(guard.lockedUntil || 0) - Date.now()) / 1000));
+}
+
+function clearSignInGuard() {
+  localStorage.removeItem(AUTH_ATTEMPT_STORAGE_KEY);
+}
+
+function recordSignInFailure(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+  const status = Number(error?.status || 0);
+  const rateLimited = status === 429 || code.includes("rate_limit") || message.includes("rate limit") || message.includes("too many requests");
+  const invalidCredentials = code === "invalid_credentials" || message.includes("invalid login credentials");
+
+  if (!rateLimited && !invalidCredentials) return 0;
+
+  const guard = readAuthGuard(AUTH_ATTEMPT_STORAGE_KEY);
+  const failures = invalidCredentials ? Number(guard.failures || 0) + 1 : Number(guard.failures || 0);
+  const shouldPause = rateLimited || failures >= SIGN_IN_FAILURE_LIMIT;
+  const lockedUntil = shouldPause
+    ? Date.now() + (rateLimited ? RATE_LIMIT_COOLDOWN_MS : SIGN_IN_COOLDOWN_MS)
+    : Number(guard.lockedUntil || 0);
+
+  localStorage.setItem(AUTH_ATTEMPT_STORAGE_KEY, JSON.stringify({
+    failures: shouldPause ? 0 : failures,
+    lockedUntil
+  }));
+
+  return cooldownSeconds(AUTH_ATTEMPT_STORAGE_KEY);
+}
+
+function recordPasswordResetRequest(duration = PASSWORD_RESET_COOLDOWN_MS) {
+  localStorage.setItem(PASSWORD_RESET_STORAGE_KEY, JSON.stringify({
+    lockedUntil: Date.now() + duration
+  }));
+}
+
+function authRedirectUrl(purpose = "auth") {
+  const isPublicWebPage = ["http:", "https:"].includes(location.protocol) &&
+    !["localhost", "127.0.0.1"].includes(location.hostname);
+  const url = new URL("club.html", isPublicWebPage ? location.href : PUBLIC_WEB_APP_URL);
+
+  // Email apps cannot reopen a capacitor:// URL. The stable HTTPS page safely
+  // completes confirmation/recovery, then tells native users to return here.
+  if (nativePlatform() !== "web") {
+    url.searchParams.set("returnToApp", "1");
+    url.searchParams.set("authPurpose", purpose);
+  }
+
+  return url.href;
 }
 
 function openAuthDialog(mode = "signin") {
+  const existing = $("#authDialog");
+  if (existing) {
+    if (!existing.open) existing.showModal();
+    $("#authEmail", existing)?.focus();
+    return;
+  }
+
   document.body.insertAdjacentHTML(
     "beforeend",
     `
     <dialog class="book-dialog" id="authDialog">
-      <form class="dialog-card" id="authForm">
+      <form class="dialog-card auth-dialog-card" id="authForm">
         <button class="dialog-close" type="button" aria-label="Close">×</button>
 
         <p class="eyebrow" id="authEyebrow">Welcome back, book lover</p>
         <h2 id="authTitle">Sign in to your shelves</h2>
 
         <div id="authNameWrap" hidden>
-          <label class="field-label">Display name</label>
+          <label class="field-label" for="authName">Display name</label>
           <input id="authName" placeholder="Your bookish name" maxlength="60">
         </div>
 
-        <label class="field-label field-label-spaced">Email</label>
+        <label class="field-label field-label-spaced" for="authEmail">Email</label>
         <input
           id="authEmail"
           type="email"
@@ -762,7 +959,7 @@ function openAuthDialog(mode = "signin") {
           autocomplete="email"
         >
 
-        <label class="field-label field-label-spaced">Password</label>
+        <label class="field-label field-label-spaced" for="authPassword">Password</label>
         <input
           id="authPassword"
           type="password"
@@ -782,6 +979,8 @@ function openAuthDialog(mode = "signin") {
         <button class="text-button auth-forgot" type="button" id="forgotPassword">
           Forgot your password?
         </button>
+
+        <p id="authStatus" class="auth-status" role="status" aria-live="polite" hidden></p>
 
         <p id="authHelp" class="field-help">
           New here? Create an account to save shelves and start a club.
@@ -807,6 +1006,51 @@ function openAuthDialog(mode = "signin") {
   $(".dialog-close", dialog).onclick = () => dialog.close();
 
   let currentMode = mode;
+  let submitBusy = false;
+  let cooldownTimer = null;
+  const submit = $("#authSubmit", dialog);
+  const forgot = $("#forgotPassword", dialog);
+  const status = $("#authStatus", dialog);
+
+  const setAuthStatus = (message = "", tone = "", guard = false) => {
+    status.textContent = message;
+    status.hidden = !message;
+    status.className = `auth-status ${tone}`;
+    status.dataset.guard = guard ? "true" : "false";
+  };
+
+  const updateSubmit = () => {
+    const waiting = currentMode === "signin" && cooldownSeconds(AUTH_ATTEMPT_STORAGE_KEY) > 0;
+    submit.disabled = submitBusy || waiting;
+    submit.textContent = submitBusy
+      ? (currentMode === "signup" ? "Opening your shelves…" : "Checking the shelves…")
+      : (currentMode === "signup" ? "Create account" : "Sign in");
+  };
+
+  const refreshSignInGuard = () => {
+    clearTimeout(cooldownTimer);
+    const seconds = currentMode === "signin"
+      ? cooldownSeconds(AUTH_ATTEMPT_STORAGE_KEY)
+      : 0;
+
+    if (seconds > 0) {
+      setAuthStatus(
+        `Let this page rest for ${seconds} second${seconds === 1 ? "" : "s"} before signing in again. Forgot your password is still available.`,
+        "attention",
+        true
+      );
+      cooldownTimer = setTimeout(refreshSignInGuard, 1000);
+    } else if (status.dataset.guard === "true") {
+      setAuthStatus();
+    }
+
+    updateSubmit();
+  };
+
+  const setSubmitBusy = busy => {
+    submitBusy = busy;
+    updateSubmit();
+  };
 
   const setMode = nextMode => {
     currentMode = nextMode;
@@ -839,9 +1083,8 @@ function openAuthDialog(mode = "signin") {
       ? "Sign in instead"
       : "Create account";
 
-    $("#authSubmit", dialog).textContent = signup
-      ? "Create account"
-      : "Sign in";
+    setAuthStatus();
+    refreshSignInGuard();
   };
 
   setMode(mode);
@@ -850,26 +1093,56 @@ function openAuthDialog(mode = "signin") {
     setMode(currentMode === "signup" ? "signin" : "signup");
   };
 
-  $("#forgotPassword", dialog).onclick = async () => {
+  forgot.onclick = async () => {
     const email = $("#authEmail", dialog).value.trim();
 
     if (!email) {
-      return alert(
-        "Enter your email address first, then choose Forgot your password."
+      setAuthStatus(
+        "Enter your email first, then choose Forgot your password so we know which shelf is yours.",
+        "attention"
       );
+      $("#authEmail", dialog).focus();
+      return;
     }
 
-    const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: authRedirectUrl()
-    });
-
-    if (error) {
-      return alert(error.message);
+    const seconds = cooldownSeconds(PASSWORD_RESET_STORAGE_KEY);
+    if (seconds > 0) {
+      setAuthStatus(
+        `A reset email was already requested. Check the newest message, or wait ${seconds} second${seconds === 1 ? "" : "s"} before sending another.`,
+        "attention"
+      );
+      return;
     }
 
-    alert(
-      "Password reset email sent. Open the newest email, set your new password, then return to Spines & Spins."
-    );
+    forgot.disabled = true;
+    forgot.textContent = "Sending a new key…";
+
+    try {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: authRedirectUrl("recovery")
+      });
+
+      if (error) {
+        const rateLimited = Number(error.status || 0) === 429 || /rate limit|too many/i.test(error.message || "");
+        if (rateLimited) recordPasswordResetRequest(RATE_LIMIT_COOLDOWN_MS);
+        setAuthStatus(friendlyNoticeMessage(error.message), "attention");
+        await alert(error.message);
+        return;
+      }
+
+      recordPasswordResetRequest();
+      setAuthStatus(
+        "Your password-reset email is on its way. Open the newest message and follow its secure link.",
+        "success"
+      );
+      await alert("Password reset email sent. Open the newest Spines & Spins email, choose a new password on the secure page, then return to the app and sign in.");
+    } catch (error) {
+      setAuthStatus(friendlyNoticeMessage(error?.message), "attention");
+      await alert(error?.message);
+    } finally {
+      forgot.disabled = false;
+      forgot.textContent = "Forgot your password?";
+    }
   };
 
   $("#authForm", dialog).onsubmit = async event => {
@@ -878,59 +1151,91 @@ function openAuthDialog(mode = "signin") {
     const email = $("#authEmail", dialog).value.trim();
     const password = $("#authPassword", dialog).value;
 
-    if (currentMode === "signup") {
-      const displayName = $("#authName", dialog).value.trim() || "Bookish Reader";
-
-      const { error } = await sb.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: authRedirectUrl(),
-          data: {
-            display_name: displayName
-          }
-        }
-      });
-
-      if (error) {
-        return alert(error.message);
-      }
-
-      alert(
-        "Your account is ready to confirm. Check your email for the confirmation link, then sign in."
-      );
-
+    if (currentMode === "signin" && cooldownSeconds(AUTH_ATTEMPT_STORAGE_KEY) > 0) {
+      refreshSignInGuard();
       return;
     }
 
-    const { error } = await sb.auth.signInWithPassword({
-      email,
-      password
-    });
+    setSubmitBusy(true);
 
-    if (error) {
-      return alert(error.message);
+    try {
+      if (currentMode === "signup") {
+        const displayName = $("#authName", dialog).value.trim() || "Bookish Reader";
+
+        const { error } = await sb.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: authRedirectUrl("confirmation"),
+            data: {
+              display_name: displayName
+            }
+          }
+        });
+
+        if (error) {
+          setAuthStatus(friendlyNoticeMessage(error.message), "attention");
+          await alert(error.message);
+          return;
+        }
+
+        setAuthStatus("Your confirmation email is on its way.", "success");
+        await alert("Your account is ready to confirm. Open the newest Spines & Spins email, follow the confirmation link, then return to the app and sign in.");
+        return;
+      }
+
+      const { error } = await sb.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        const seconds = recordSignInFailure(error);
+        if (seconds > 0) {
+          refreshSignInGuard();
+        } else {
+          setAuthStatus(friendlyNoticeMessage(error.message), "attention");
+        }
+        await alert(error.message);
+        return;
+      }
+
+      clearSignInGuard();
+      dialog.close();
+      location.href = "club.html";
+    } catch (error) {
+      setAuthStatus(friendlyNoticeMessage(error?.message), "attention");
+      await alert(error?.message);
+    } finally {
+      if (dialog.isConnected) {
+        setSubmitBusy(false);
+        refreshSignInGuard();
+      }
     }
-
-    dialog.close();
-    location.href = "club.html";
   };
 
-  dialog.addEventListener("close", () => dialog.remove());
+  dialog.addEventListener("close", () => {
+    clearTimeout(cooldownTimer);
+    dialog.remove();
+  });
 }
 
 function openPasswordResetDialog() {
   if ($("#passwordResetDialog")) return;
 
+  const authDialog = $("#authDialog");
+  if (authDialog?.open) authDialog.close();
+
   document.body.insertAdjacentHTML(
     "beforeend",
     `
     <dialog class="book-dialog" id="passwordResetDialog">
-      <form class="dialog-card" id="passwordResetForm">
+      <form class="dialog-card auth-dialog-card" id="passwordResetForm">
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
         <p class="eyebrow">Your reading world is safe</p>
         <h2>Choose a new password</h2>
 
-        <label class="field-label">New password</label>
+        <label class="field-label" for="newPassword">New password</label>
         <input
           id="newPassword"
           type="password"
@@ -940,7 +1245,7 @@ function openPasswordResetDialog() {
           placeholder="At least 8 characters"
         >
 
-        <label class="field-label field-label-spaced">Confirm new password</label>
+        <label class="field-label field-label-spaced" for="confirmPassword">Confirm new password</label>
         <input
           id="confirmPassword"
           type="password"
@@ -950,7 +1255,9 @@ function openPasswordResetDialog() {
           placeholder="Type it one more time"
         >
 
-        <button class="primary-button full-button" type="submit">
+        <p id="passwordResetStatus" class="auth-status" role="status" aria-live="polite" hidden></p>
+
+        <button class="primary-button full-button" id="saveNewPassword" type="submit">
           Save new password
         </button>
       </form>
@@ -960,25 +1267,48 @@ function openPasswordResetDialog() {
 
   const dialog = $("#passwordResetDialog");
   dialog.showModal();
+  $(".dialog-close", dialog).onclick = () => dialog.close();
 
   $("#passwordResetForm", dialog).onsubmit = async event => {
     event.preventDefault();
 
     const password = $("#newPassword", dialog).value;
+    const status = $("#passwordResetStatus", dialog);
+    const submit = $("#saveNewPassword", dialog);
+    const setResetStatus = (message, tone = "attention") => {
+      status.textContent = message;
+      status.className = `auth-status ${tone}`;
+      status.hidden = !message;
+    };
 
     if (password !== $("#confirmPassword", dialog).value) {
-      return alert("Those passwords do not match yet.");
+      setResetStatus("Those passwords do not match yet. Read both lines once more and try again.");
+      await alert("Those passwords do not match yet.");
+      return;
     }
 
+    submit.disabled = true;
+    submit.textContent = "Saving your new key…";
     const { error } = await sb.auth.updateUser({ password });
 
     if (error) {
-      return alert(error.message);
+      submit.disabled = false;
+      submit.textContent = "Save new password";
+      setResetStatus(friendlyNoticeMessage(error.message));
+      await alert(error.message);
+      return;
     }
 
-    alert("Your password has been updated. You are signed in.");
+    clearSignInGuard();
+    localStorage.removeItem(PASSWORD_RESET_STORAGE_KEY);
+    setResetStatus("Your new password is saved.", "success");
+    await alert(
+      getParam("returnToApp") === "1"
+        ? "Your password has been updated. Return to the Spines & Spins app and sign in with your new password."
+        : "Your password has been updated. You are signed in and ready for your next chapter."
+    );
     dialog.close();
-    location.href = "club.html";
+    location.href = getParam("returnToApp") === "1" ? "index.html?passwordReset=complete" : "club.html";
   };
 
   dialog.addEventListener("close", () => dialog.remove());

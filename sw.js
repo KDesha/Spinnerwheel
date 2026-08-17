@@ -1,4 +1,4 @@
-const CACHE = "spines-and-spins-store-v3";
+const CACHE = "spines-and-spins-store-v4";
 
 const ASSETS = [
   "./",
@@ -10,8 +10,8 @@ const ASSETS = [
   "./privacy.html",
   "./terms.html",
   "./support.html",
-  "./style.css?v=store-v3",
-  "./app-v2.js?v=store-v3",
+  "./style.css?v=store-v4",
+  "./app-v2.js?v=store-v4",
   "./vendor/supabase.js",
   "./manifest.webmanifest",
   "./Portal.jpeg"
