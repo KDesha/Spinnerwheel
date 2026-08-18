@@ -284,6 +284,8 @@ function isOwner() {
 }
 
 async function initialize() {
+  bindExternalLinks();
+
   const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
     ? getParam("preview")
     : "";
@@ -437,6 +439,40 @@ function revenueCatPlugin() {
 
 function nativePlatform() {
   return window.Capacitor?.getPlatform?.() || "web";
+}
+
+function nativeBrowserPlugin() {
+  return window.Capacitor?.Plugins?.Browser || null;
+}
+
+function bindExternalLinks() {
+  document.addEventListener("click", event => {
+    const target = event.target instanceof Element ? event.target : null;
+    const link = target?.closest('a[target="_blank"]');
+
+    if (!link || nativePlatform() === "web") return;
+
+    const href = link.getAttribute("href");
+    if (!href) return;
+
+    event.preventDefault();
+    const url = new URL(href, PUBLIC_WEB_APP_URL).href;
+    const browser = nativeBrowserPlugin();
+
+    if (!browser?.open) {
+      location.href = url;
+      return;
+    }
+
+    browser.open({
+      url,
+      presentationStyle: "fullscreen",
+      toolbarColor: "#6f2635"
+    }).catch(error => {
+      console.warn("The in-app browser could not open this page:", error);
+      location.href = url;
+    });
+  });
 }
 
 async function initializeRevenueCat() {
@@ -969,6 +1005,18 @@ function openAuthDialog(mode = "signin") {
           autocomplete="current-password"
         >
 
+        <div id="authPasswordConfirmWrap" hidden>
+          <label class="field-label field-label-spaced" for="authPasswordConfirm">Confirm password</label>
+          <input
+            id="authPasswordConfirm"
+            type="password"
+            minlength="8"
+            placeholder="Type it one more time"
+            autocomplete="new-password"
+            disabled
+          >
+        </div>
+
         <div id="authConsentWrap" hidden>
           <label class="toggle-line auth-consent">
             <input id="authConsent" type="checkbox" disabled>
@@ -1075,6 +1123,11 @@ function openAuthDialog(mode = "signin") {
       ? "new-password"
       : "current-password";
 
+    $("#authPasswordConfirmWrap", dialog).hidden = !signup;
+    $("#authPasswordConfirm", dialog).required = signup;
+    $("#authPasswordConfirm", dialog).disabled = !signup;
+    if (!signup) $("#authPasswordConfirm", dialog).value = "";
+
     $("#authHelp", dialog).textContent = signup
       ? "Already have an account? Sign in instead."
       : "New here? Create an account to save shelves and start a club.";
@@ -1151,6 +1204,19 @@ function openAuthDialog(mode = "signin") {
     const email = $("#authEmail", dialog).value.trim();
     const password = $("#authPassword", dialog).value;
 
+    if (
+      currentMode === "signup" &&
+      password !== $("#authPasswordConfirm", dialog).value
+    ) {
+      setAuthStatus(
+        "Those passwords do not match yet. Read both lines once more and try again.",
+        "attention"
+      );
+      $("#authPasswordConfirm", dialog).focus();
+      await alert("Those passwords do not match yet.");
+      return;
+    }
+
     if (currentMode === "signin" && cooldownSeconds(AUTH_ATTEMPT_STORAGE_KEY) > 0) {
       refreshSignInGuard();
       return;
@@ -1181,6 +1247,15 @@ function openAuthDialog(mode = "signin") {
 
         setAuthStatus("Your confirmation email is on its way.", "success");
         await alert("Your account is ready to confirm. Open the newest Spines & Spins email, follow the confirmation link, then return to the app and sign in.");
+
+        setMode("signin");
+        $("#authEmail", dialog).value = email;
+        $("#authPassword", dialog).value = "";
+        setAuthStatus(
+          "Confirm your email from the newest Spines & Spins message, then enter your password to sign in.",
+          "success"
+        );
+        $("#authPassword", dialog).focus();
         return;
       }
 

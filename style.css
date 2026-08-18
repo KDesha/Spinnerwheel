@@ -1283,8 +1283,12 @@ textarea:focus { border-color:var(--gold); }
 .auth-forgot { width: auto; margin: 10px 0 0; padding: 0; font-size: .9rem; text-align: left; }
 .auth-dialog-card {
   width: min(620px, 100%);
+  max-height: calc(100dvh - 24px);
   margin: 0 auto;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background:
     radial-gradient(circle at 88% 0%, rgba(255,213,138,.18), transparent 29%),
     radial-gradient(circle at 3% 100%, rgba(156,62,85,.20), transparent 32%),
