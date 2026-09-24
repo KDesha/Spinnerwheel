@@ -24,7 +24,11 @@ await mkdir(pagesVendorDirectory, { recursive: true });
 
 const entries = await readdir(projectRoot, { withFileTypes: true });
 const assets = entries
-  .filter(entry => entry.isFile() && webAssetPattern.test(entry.name))
+  .filter(
+    entry =>
+      entry.isFile() &&
+      (entry.name === "_headers" || webAssetPattern.test(entry.name))
+  )
   .map(entry => entry.name)
   .sort();
 
