@@ -1,10 +1,13 @@
 const SUPABASE_URL = "https://rogeqnlbbzcrifuiyhsr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_TUtkRHF0gz91QOwDdXTNKQ_iwR_PcbN";
-const PUBLIC_WEB_APP_URL = "https://kdesha.github.io/Spinnerwheel/";
+const PUBLIC_WEB_APP_URL = "https://spinesandspins.netlify.app/";
 const APPLE_SUBSCRIPTIONS_URL = "https://apps.apple.com/account/subscriptions";
+const GOOGLE_PLAY_SUBSCRIPTIONS_URL = "https://play.google.com/store/account/subscriptions";
 const APPLE_STANDARD_EULA_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
 const AUTH_ATTEMPT_STORAGE_KEY = "spinesAndSpinsAuthAttemptGuard";
 const PASSWORD_RESET_STORAGE_KEY = "spinesAndSpinsPasswordResetGuard";
+const PWA_INSTALL_DISMISSED_STORAGE_KEY = "spinesAndSpinsPwaInstallDismissed";
+const PENDING_WEB_PURCHASE_STORAGE_KEY = "spinesAndSpinsPendingWebPurchase";
 const SIGN_IN_FAILURE_LIMIT = 3;
 const SIGN_IN_COOLDOWN_MS = 30_000;
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
@@ -15,6 +18,9 @@ const PASSWORD_RESET_COOLDOWN_MS = 60_000;
 const REVENUECAT_IOS_API_KEY = "appl_aHlmxFRtjCcXMMmlRmnFvZWzPkO";
 const REVENUECAT_ANDROID_API_KEY = "";
 const REVENUECAT_OFFERING_ID = "spines_and_spins";
+// Public RevenueCat Web Purchase Link base. The signed-in Supabase user ID
+// and selected package are appended when browser checkout begins.
+const REVENUECAT_WEB_PURCHASE_LINK = "https://pay.rev.cat/hdkxpnasozwaokez";
 
 const SUBSCRIPTION_TIERS = {
   first_chapter: {
@@ -109,6 +115,7 @@ let clubBooks = [];
 let currentClubPlan = SUBSCRIPTION_TIERS.first_chapter;
 let revenueCatReady = false;
 let revenueCatOfferings = null;
+let deferredPwaInstallPrompt = null;
 let rotation = 0;
 let spinning = false;
 let selectedTags = new Set();
@@ -274,6 +281,183 @@ function genreForSlug(slug) {
   return GENRES.find(genre => genre.slug === slug) || GENRES[3];
 }
 
+function previewLibraryBooks() {
+  const shelves = {
+    Romance: ["Pride and Prejudice", "Beach Read", "The Unhoneymooners", "Book Lovers", "The Seven Year Slip", "Funny Story"],
+    Fantasy: ["The Night Circus", "The Hobbit", "Fourth Wing", "A Court of Thorns and Roses", "The Priory of the Orange Tree", "The Invisible Life of Addie LaRue"],
+    "Sci-Fi": ["Dune", "Project Hail Mary", "The Long Way to a Small, Angry Planet", "Sea of Tranquility", "The Martian", "Dark Matter"],
+    Mystery: ["The Thursday Murder Club", "The Guest List", "The Maid", "The Woman in Cabin 10", "Magpie Murders", "The Paris Apartment"],
+    "Thriller & Suspense": ["The Silent Patient", "The Housemaid", "None of This Is True", "The Last Mrs. Parrish", "Local Woman Missing", "The Only One Left"],
+    Horror: ["Mexican Gothic", "The Haunting of Hill House", "The Only Good Indians", "The September House", "The Final Girl Support Group", "How to Sell a Haunted House"],
+    "Action & Adventure": ["Treasure Island", "The Wager", "The Lost City of Z", "The Adventures of Amina al-Sirafi", "Into Thin Air", "The River of Doubt"]
+  };
+
+  return Object.entries(shelves).flatMap(([genre, titles]) =>
+    titles.map((title, index) => ({
+      id: `preview-${genre.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${index + 1}`,
+      title,
+      authors: ["Spines & Spins selection"],
+      genres: [genre],
+      status: "wheel",
+      created_at: new Date(2026, 0, index + 1).toISOString()
+    }))
+  );
+}
+
+function previewReadingRoomData() {
+  const book = {
+    id: "preview-reading-room",
+    title: "The Night Circus",
+    authors: ["Erin Morgenstern"],
+    genres: ["Fantasy", "Romance"],
+    status: "reading",
+    cover_url: "https://covers.openlibrary.org/b/isbn/9780385534635-L.jpg",
+    description: "The circus arrives without warning. Within its black-and-white tents, a fierce competition unfolds between two young magicians trained since childhood for a mysterious contest of imagination and will."
+  };
+
+  const chapters = [
+    { id: "preview-chapter-1", chapter_number: 1, chapter_title: "Unexpected Mail", chapter_message_count: 4 },
+    { id: "preview-chapter-2", chapter_number: 2, chapter_title: "Illumination", chapter_message_count: 7 },
+    { id: "preview-chapter-3", chapter_number: 3, chapter_title: "The Magician's Umbrella", chapter_message_count: 3 },
+    { id: "preview-chapter-4", chapter_number: 4, chapter_title: "Le Bateleur", chapter_message_count: 6, has_trigger_warning: true },
+    { id: "preview-chapter-5", chapter_number: 5, chapter_title: "The Contortionist", chapter_message_count: 2 },
+    { id: "preview-chapter-6", chapter_number: 6, chapter_title: "Target Practice", chapter_message_count: 5 }
+  ];
+
+  const updates = [
+    { user_id: user.id, display_name: "Preview Reader", outcome: "finished", rating: 5, trigger_warning: false },
+    { user_id: "preview-reader-maya", display_name: "Maya", outcome: "finished", rating: 5, trigger_warning: false },
+    { user_id: "preview-reader-jordan", display_name: "Jordan", outcome: "finished", rating: 4, trigger_warning: true },
+    { user_id: "preview-reader-sam", display_name: "Sam", outcome: null, rating: 4, trigger_warning: false }
+  ];
+
+  const messages = [
+    {
+      id: "preview-message-1",
+      author_id: "preview-reader-maya",
+      body: "The atmosphere in this chapter is incredible. I can practically see every light in the circus.",
+      chapter_rating: 5,
+      trigger_warning: false,
+      created_at: "2026-08-23T19:14:00.000Z",
+      profiles: { display_name: "Maya" }
+    },
+    {
+      id: "preview-message-2",
+      author_id: user.id,
+      body: "Same! I also think the clock is going to matter later. Saving that theory here so we can come back to it.",
+      chapter_rating: 4,
+      trigger_warning: false,
+      created_at: "2026-08-23T19:31:00.000Z",
+      profiles: { display_name: "Preview Reader" }
+    },
+    {
+      id: "preview-message-3",
+      author_id: "preview-reader-jordan",
+      body: "A quick heads-up for this chapter: there is a tense scene involving a child in danger.",
+      chapter_rating: null,
+      trigger_warning: true,
+      created_at: "2026-08-23T20:02:00.000Z",
+      profiles: { display_name: "Jordan" }
+    }
+  ];
+
+  return { book, chapters, updates, messages };
+}
+
+function previewBookHero(book, warningReaders = []) {
+  return `
+    <section class="book-room glass-panel preview-book-room">
+      <div class="book-cover-area">
+        <img src="${escapeHtml(book.cover_url)}" alt="Cover of ${escapeHtml(book.title)}">
+      </div>
+      <div class="book-details">
+        <p class="eyebrow">Currently reading</p>
+        <h2>${escapeHtml(book.title)}</h2>
+        <p class="book-authors">${escapeHtml(book.authors.join(", "))}</p>
+        <div class="book-tags">${book.genres.map(genre => `<span>${escapeHtml(genre)}</span>`).join("")}${warningReaders.length ? `<span class="tw-book-tag">TW flagged</span>` : ""}</div>
+        <div class="book-description is-collapsed">
+          <p class="eyebrow">About this book</p>
+          <p class="book-description-preview">${escapeHtml(descriptionPreview(book.description, 2))}</p>
+        </div>
+      </div>
+    </section>`;
+}
+
+function renderPreviewReadingRoom(scene) {
+  const { book, chapters, updates, messages } = previewReadingRoomData();
+  const warningReaders = updates.filter(update => update.trigger_warning);
+  document.body.classList.add(`preview-${scene}`);
+  applyBookTheme(book);
+
+  if (scene === "reading-room") {
+    $("#app").innerHTML = `
+      ${topBar("Book of the Month", "The Night Circus")}
+      ${previewBookHero(book, warningReaders)}
+      <section class="chapters-section glass-panel preview-chapters-peek">
+        <div class="section-heading"><div><p class="eyebrow">Spoiler-safe reading room</p><h2>Chapters &amp; group notes</h2><p>Every chapter has its own private conversation.</p></div></div>
+        <div class="chapter-list">${chapters.slice(0, 3).map(chapter => chapterCard(chapter)).join("")}</div>
+      </section>`;
+    return;
+  }
+
+  if (scene === "chapters") {
+    $("#app").innerHTML = `
+      ${topBar("Reading Room", "The Night Circus")}
+      <section class="chapters-section glass-panel preview-chapter-list">
+        <div class="section-heading"><div><p class="eyebrow">Spoiler-safe conversations</p><h2>Read together, chapter by chapter.</h2><p>Reactions stay with the chapter, so nobody has to dodge spoilers.</p></div></div>
+        <div class="chapter-list">${chapters.map(chapter => chapterCard(chapter)).join("")}</div>
+      </section>`;
+    return;
+  }
+
+  if (scene === "chapter-chat") {
+    $("#app").innerHTML = `
+      ${topBar("Chapter Discussion", "Illumination")}
+      <section class="glass-panel preview-chat-shell">
+        <div class="preview-chat-heading"><p class="eyebrow">The Night Circus · Chapter 2</p><h2>Talk through every twist.</h2><p>Share theories, reactions, heart ratings, and thoughtful content warnings.</p></div>
+        <div class="message-thread preview-message-thread">${messages.map(messageCard).join("")}</div>
+        <div class="preview-message-composer"><div>Share a thought, theory, reaction, or question…</div><div class="preview-composer-actions"><span>🎙 Voice note</span><strong>Send note</strong></div></div>
+      </section>`;
+    return;
+  }
+
+  if (scene === "progress") {
+    $("#app").innerHTML = `
+      ${topBar("Reading Progress", "The Night Circus")}
+      <div class="preview-progress-intro"><p class="eyebrow">Your whole club at a glance</p><h2>See how the adventure landed.</h2><p>Finished books, heart ratings, busy chapters, and reader check-ins stay together.</p></div>
+      ${groupReadingSummaryMarkup(updates, chapters)}`;
+    return;
+  }
+
+  if (scene === "content-care") {
+    $("#app").innerHTML = `
+      ${topBar("Content Care", "The Night Circus")}
+      ${previewBookHero(book, warningReaders)}
+      <section class="trigger-warning-panel glass-panel preview-trigger-panel">
+        <div><p class="eyebrow">Content care</p><h2>Help your club read comfortably.</h2><p>Readers can privately flag a possible trigger, while chapter-specific warnings appear before the discussion opens.</p></div>
+        <label class="tw-toggle tw-standalone"><input type="checkbox" checked> <span class="tw-badge">TW</span><span>You flagged a possible trigger warning. You can uncheck this anytime.</span></label>
+      </section>
+      <section class="glass-panel preview-care-example">
+        ${chapterCard(chapters.find(chapter => chapter.has_trigger_warning))}
+      </section>`;
+    return;
+  }
+
+  if (scene === "current-adventure") {
+    $("#app").innerHTML = `
+      ${topBar("Midnight Margins", "Your club's current read")}
+      <section class="current-adventure glass-panel preview-current-adventure">
+        <div class="current-adventure-cover"><img src="${escapeHtml(book.cover_url)}" alt=""></div>
+        <div class="current-adventure-copy"><p class="eyebrow">Current adventure</p><h1>${escapeHtml(book.title)}</h1><p>${escapeHtml(book.authors.join(", "))}</p><div class="current-adventure-actions"><button class="primary-button">Open reading room</button></div><p class="unread-message-note">✦ 5 new group messages waiting</p></div>
+        <div class="member-progress">
+          <p class="eyebrow">Reader check-in</p>
+          <div class="progress-summary"><div class="progress-stat"><strong>3</strong><span>finished</span></div><div class="progress-stat"><strong>0</strong><span>DNF</span></div><div class="progress-stat"><strong>1</strong><span>TW flag</span></div></div>
+          <div class="member-update-list">${updates.map(update => `<article class="member-update-row"><div><strong>${escapeHtml(update.display_name)}</strong><span>${update.outcome === "finished" ? "Finished" : "Reading"}</span></div><div class="mini-hearts">${heartRating(update.rating)}</div>${update.trigger_warning ? `<span class="tw-badge">TW</span>` : ""}</article>`).join("")}</div>
+        </div>
+      </section>`;
+  }
+}
+
 function isAdmin() {
   return currentClub?.membership?.role === "owner" ||
     currentClub?.membership?.role === "admin";
@@ -302,8 +486,30 @@ async function initialize() {
 
     user = { id: "00000000-0000-4000-8000-000000000001", email: "reader@example.com" };
     profile = { id: user.id, display_name: "Preview Reader", subscription_tier: "first_chapter" };
-    currentClub = { id: "preview-club", name: "Midnight Margins", membership: { role: "owner" } };
+    currentClub = {
+      id: "preview-club",
+      name: "Midnight Margins",
+      enabled_genres: ALL_GENRE_NAMES,
+      membership: { role: "owner" }
+    };
+    clubBooks = previewLibraryBooks();
+    document.body.classList.add("capture-preview");
+    if (getParam("phone") === "1") {
+      document.body.classList.add("capture-phone");
+    }
     updateNav();
+    if (localPreview === "genres" || localPreview === "genres-selected") {
+      await renderGenreWheel();
+      if (localPreview === "genres-selected") {
+        const selected = getParam("selected") || "fantasy";
+        const chosen = $(`[data-genre-book="${selected}"]`);
+        chosen?.classList.add("is-lit");
+      }
+    }
+    if (localPreview === "wheel") await renderBookWheel();
+    if (["reading-room", "chapters", "chapter-chat", "progress", "content-care", "current-adventure"].includes(localPreview)) {
+      renderPreviewReadingRoom(localPreview);
+    }
     if (localPreview === "paywall") openPaywall();
     if (localPreview === "pick") {
       await openPickDialog({
@@ -380,11 +586,87 @@ async function initialize() {
 
   updateNav();
   await bootRoute();
+  reconcileCompletedWebCheckout().catch(error => {
+    console.warn("Web purchase reconciliation was skipped:", error);
+  });
 }
 
 function registerPWA() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(console.warn);
+  }
+
+  initializePwaInstallExperience();
+}
+
+function isStandaloneWebApp() {
+  return window.matchMedia?.("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+}
+
+function isAndroidWebBrowser() {
+  return nativePlatform() === "web" && /Android/i.test(navigator.userAgent || "");
+}
+
+function initializePwaInstallExperience() {
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredPwaInstallPrompt = event;
+    renderPwaInstallBanner();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredPwaInstallPrompt = null;
+    localStorage.removeItem(PWA_INSTALL_DISMISSED_STORAGE_KEY);
+    $("#pwaInstallBanner")?.remove();
+  });
+
+  if (getParam("install") === "1") {
+    renderPwaInstallBanner({ force: true });
+  }
+}
+
+function renderPwaInstallBanner({ force = false } = {}) {
+  if (nativePlatform() !== "web" || isStandaloneWebApp() || $("#pwaInstallBanner")) return;
+
+  const dismissedAt = Number(localStorage.getItem(PWA_INSTALL_DISMISSED_STORAGE_KEY) || 0);
+  const recentlyDismissed = Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000;
+  const shouldOffer = force || (isAndroidWebBrowser() && deferredPwaInstallPrompt && !recentlyDismissed);
+  if (!shouldOffer) return;
+
+  const canPrompt = Boolean(deferredPwaInstallPrompt);
+  document.body.insertAdjacentHTML("beforeend", `
+    <aside class="pwa-install-banner" id="pwaInstallBanner" aria-label="Install Spines and Spins on Android">
+      <img src="pwa-icon-192.png" alt="" aria-hidden="true">
+      <div class="pwa-install-copy">
+        <p class="eyebrow">Android quick install</p>
+        <strong>Keep Spines &amp; Spins on your home screen.</strong>
+        <span>${canPrompt ? "Install it like an app—no Play Store wait." : "Open this link in Chrome, then use ⋮ → Add to Home screen."}</span>
+      </div>
+      <div class="pwa-install-actions">
+        <button class="primary-button" id="confirmPwaInstall" type="button">${canPrompt ? "Install app" : "Show me how"}</button>
+        <button class="text-button" id="dismissPwaInstall" type="button">Not now</button>
+      </div>
+    </aside>`);
+
+  $("#confirmPwaInstall").onclick = requestPwaInstall;
+  $("#dismissPwaInstall").onclick = () => {
+    localStorage.setItem(PWA_INSTALL_DISMISSED_STORAGE_KEY, String(Date.now()));
+    $("#pwaInstallBanner")?.remove();
+  };
+}
+
+async function requestPwaInstall() {
+  if (!deferredPwaInstallPrompt) {
+    await alert("On Android, open Spines & Spins in Chrome, tap the three-dot menu, then choose Add to Home screen or Install app.");
+    return;
+  }
+
+  await deferredPwaInstallPrompt.prompt();
+  const choice = await deferredPwaInstallPrompt.userChoice;
+  deferredPwaInstallPrompt = null;
+  if (choice?.outcome === "accepted") {
+    $("#pwaInstallBanner")?.remove();
   }
 }
 
@@ -443,6 +725,59 @@ function nativePlatform() {
 
 function nativeBrowserPlugin() {
   return window.Capacitor?.Plugins?.Browser || null;
+}
+
+function webCheckoutConfigured() {
+  return /^https:\/\/pay\.rev\.cat\/[A-Za-z0-9_-]+\/?$/.test(REVENUECAT_WEB_PURCHASE_LINK.trim());
+}
+
+function webCheckoutUrl(tierId) {
+  if (!webCheckoutConfigured() || !user) return "";
+  const base = REVENUECAT_WEB_PURCHASE_LINK.trim().replace(/\/+$/, "");
+  const checkout = new URL(`${base}/${encodeURIComponent(user.id)}`);
+  checkout.searchParams.set("package_id", tierId);
+  checkout.searchParams.set("utm_source", "android_pwa");
+  if (user.email) checkout.searchParams.set("email", user.email);
+  return checkout.href;
+}
+
+function subscriptionManagementMarkup() {
+  const platform = nativePlatform();
+  if (platform === "web") {
+    return `<a href="support.html#web-subscriptions" target="_blank" rel="noopener">Manage web subscription</a>`;
+  }
+  if (platform === "android") {
+    return `<a href="${GOOGLE_PLAY_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage Google Play subscription</a>`;
+  }
+  return `<a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage App Store subscription</a>`;
+}
+
+function paidPlanDeletionWarning() {
+  const platform = nativePlatform();
+  if (platform === "web") {
+    return `Deleting this account does not cancel web billing. Use the secure management link in your RevenueCat billing email first, or <a href="support.html#web-subscriptions" target="_blank" rel="noopener">contact support</a>.`;
+  }
+  if (platform === "android") {
+    return `Deleting this account does not cancel Google Play billing. <a href="${GOOGLE_PLAY_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Cancel your subscription with Google Play first</a> if you do not want it to renew.`;
+  }
+  return `Deleting this account does not cancel App Store billing. <a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Cancel your subscription with Apple first</a> if you do not want it to renew.`;
+}
+
+function paywallBillingMarkup() {
+  const platform = nativePlatform();
+  if (platform === "web") {
+    return `
+      <p>Each paid plan is a one-month auto-renewable subscription. Web payments are handled securely by RevenueCat Billing and Stripe and renew monthly until canceled.</p>
+      <p class="legal-links"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span aria-hidden="true">·</span><a href="terms.html" target="_blank" rel="noopener">Terms of Use</a><span aria-hidden="true">·</span><a href="support.html#web-subscriptions" target="_blank" rel="noopener">Manage Subscription</a></p>`;
+  }
+  if (platform === "android") {
+    return `
+      <p>Each plan is a one-month auto-renewable subscription. Payment is charged to your Google Play account when you confirm and renews monthly until canceled.</p>
+      <p class="legal-links"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span aria-hidden="true">·</span><a href="terms.html" target="_blank" rel="noopener">Terms of Use</a><span aria-hidden="true">·</span><a href="${GOOGLE_PLAY_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage Subscription</a></p>`;
+  }
+  return `
+    <p>Each plan is a one-month auto-renewable subscription. Payment is charged to your App Store account when you confirm. It renews monthly unless canceled at least 24 hours before the current period ends.</p>
+    <p class="legal-links"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span aria-hidden="true">·</span><a href="${APPLE_STANDARD_EULA_URL}" target="_blank" rel="noopener">Terms of Use</a><span aria-hidden="true">·</span><a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage Subscription</a></p>`;
 }
 
 function bindExternalLinks() {
@@ -598,7 +933,7 @@ function openAccountMenu() {
           <a href="support.html" target="_blank" rel="noopener">Support</a>
           <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>
           <a href="terms.html" target="_blank" rel="noopener">Terms of use</a>
-          <a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage App Store subscription</a>
+          ${subscriptionManagementMarkup()}
           <button class="text-button" id="manageBlockedReaders" type="button">Blocked readers</button>
           <button class="text-button danger-link" id="deleteAccount" type="button">Delete account</button>
         </div>
@@ -732,7 +1067,7 @@ function openDeleteAccountDialog() {
         <p class="eyebrow">Permanent account deletion</p>
         <h2>Delete your reading world?</h2>
         <p class="field-help">This permanently deletes your profile, memberships, messages, reading updates, voice notes, and every club you own. This cannot be undone.</p>
-        ${hasPaidPlan ? `<p class="deletion-subscription-warning">Deleting this account does not cancel App Store billing. <a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Cancel your subscription with Apple first</a> if you do not want it to renew.</p>` : ""}
+        ${hasPaidPlan ? `<p class="deletion-subscription-warning">${paidPlanDeletionWarning()}</p>` : ""}
         <label class="field-label field-label-spaced" for="deleteConfirmation">Type DELETE to confirm</label>
         <input id="deleteConfirmation" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
         <p id="deleteAccountStatus" class="field-help" role="status" aria-live="polite"></p>
@@ -815,9 +1150,8 @@ function openPaywall({ reason = "", requiredTier = "" } = {}) {
           ${Object.values(SUBSCRIPTION_TIERS).map(plan => planCardMarkup(plan)).join("")}
         </div>
         <div class="paywall-footer">
-          <button class="text-button" id="restorePurchases" type="button">Restore purchases</button>
-          <p>Each plan is a one-month auto-renewable subscription. Payment is charged to your App Store account when you confirm. It renews monthly unless canceled at least 24 hours before the current period ends.</p>
-          <p class="legal-links"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span aria-hidden="true">·</span><a href="${APPLE_STANDARD_EULA_URL}" target="_blank" rel="noopener">Terms of Use</a><span aria-hidden="true">·</span><a href="${APPLE_SUBSCRIPTIONS_URL}" target="_blank" rel="noopener">Manage Subscription</a></p>
+          ${nativePlatform() === "web" ? "" : `<button class="text-button" id="restorePurchases" type="button">Restore purchases</button>`}
+          ${paywallBillingMarkup()}
           <p id="purchaseStatus" role="status" aria-live="polite"></p>
         </div>
       </div>
@@ -831,12 +1165,29 @@ function openPaywall({ reason = "", requiredTier = "" } = {}) {
   $$('[data-purchase-tier]', dialog).forEach(button => {
     button.onclick = () => purchaseTier(button.dataset.purchaseTier, dialog);
   });
-  $("#restorePurchases", dialog).onclick = () => restorePurchases(dialog);
+  $("#restorePurchases", dialog)?.addEventListener("click", () => restorePurchases(dialog));
   dialog.addEventListener("close", () => dialog.remove());
 }
 
 async function purchaseTier(tierId, dialog) {
   const status = $("#purchaseStatus", dialog);
+  if (nativePlatform() === "web") {
+    const checkoutUrl = webCheckoutUrl(tierId);
+    if (!user) {
+      status.textContent = "Sign in before choosing a membership so it can be added to your account.";
+      return;
+    }
+    if (!checkoutUrl) {
+      status.textContent = "Secure web checkout is being connected. Please try again soon.";
+      return;
+    }
+
+    localStorage.setItem(PENDING_WEB_PURCHASE_STORAGE_KEY, tierId);
+    status.textContent = "Opening secure checkout…";
+    location.assign(checkoutUrl);
+    return;
+  }
+
   const purchases = revenueCatPlugin();
   const selectedPackage = packageForTier(tierId);
   if (!revenueCatReady || !purchases || !selectedPackage) {
@@ -898,6 +1249,31 @@ async function waitForSubscriptionProfile(expectedTier, attempts = 8) {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   return false;
+}
+
+async function reconcileCompletedWebCheckout() {
+  if (nativePlatform() !== "web" || getParam("checkout") !== "complete") return;
+
+  const expectedTier = localStorage.getItem(PENDING_WEB_PURCHASE_STORAGE_KEY) || "";
+  const cleanUrl = new URL(location.href);
+  cleanUrl.searchParams.delete("checkout");
+  cleanUrl.searchParams.delete("app_user_id");
+  history.replaceState({}, "", `${cleanUrl.pathname.split("/").pop()}${cleanUrl.search}${cleanUrl.hash}`);
+
+  if (!user) {
+    await alert("Your payment finished, but you need to sign in again before the membership can appear on this device.");
+    return;
+  }
+
+  setStatus("Your membership is syncing…");
+  const synced = await waitForSubscriptionProfile(expectedTier, 12);
+  localStorage.removeItem(PENDING_WEB_PURCHASE_STORAGE_KEY);
+  updateNav();
+  setStatus("");
+
+  await alert(synced
+    ? "Payment complete. Your new membership is ready on this device and on iPhone."
+    : "Payment complete. RevenueCat is still syncing your membership; it should appear shortly.");
 }
 
 function readAuthGuard(key) {
@@ -2066,6 +2442,10 @@ async function joinPublic(clubId) {
 }
 
 async function loadClubBooks() {
+  if (!sb && ["localhost", "127.0.0.1"].includes(location.hostname) && getParam("preview")) {
+    return clubBooks;
+  }
+
   const { data, error } = await sb
     .from("club_books")
     .select("*")

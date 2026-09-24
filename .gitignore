@@ -13,3 +13,4 @@ README-v*.txt
 *.mobileprovision
 *.ipa
 *.xcarchive/
+vendor/stripe_backup_code.txt

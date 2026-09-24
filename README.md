@@ -21,6 +21,12 @@ npm run open:ios
 
 The bundle identifier is `com.kayladeshasier.spinesandspins` and the minimum iOS version is 15.0.
 
+## Android quick launch (installable web app)
+
+Android readers can open `https://spinesandspins.netlify.app/?install=1` in Chrome and add Spines & Spins to their home screen. The manifest, service worker, standard icon, and maskable Android icon are included in the web build.
+
+Browser subscriptions use a RevenueCat Web Purchase Link backed by RevenueCat Billing and Stripe. This is intentionally separate from Apple in-app purchase while sharing the same Supabase account, RevenueCat entitlements, and subscription webhook. Complete the Web/Android PWA section in `REVENUECAT_SETUP.md` before enabling production checkout.
+
 ## Release setup
 
-Read `APP_STORE_RELEASE.md` before publishing. Google and RevenueCat credentials must be configured in their dashboards and Supabase; secret credentials must never be committed to this repository.
+Read `APP_STORE_RELEASE.md` before publishing. Apple, Google, Stripe, and RevenueCat configuration must be completed in their respective dashboards and Supabase; secret credentials must never be committed to this repository.

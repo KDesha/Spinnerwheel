@@ -1,9 +1,47 @@
 {
+  "id": "./",
   "name": "Spines & Spins",
   "short_name": "Spines & Spins",
   "description": "Where book clubs find their next adventure.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#160909",
-  "theme_color": "#6f2635"
+  "theme_color": "#6f2635",
+  "lang": "en-US",
+  "categories": ["books", "lifestyle", "social"],
+  "icons": [
+    {
+      "src": "./pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./pwa-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "My Clubs",
+      "short_name": "Clubs",
+      "url": "./club.html",
+      "icons": [{ "src": "./pwa-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Spin the Genres",
+      "short_name": "Genres",
+      "url": "./genres.html",
+      "icons": [{ "src": "./pwa-icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

@@ -1,4 +1,4 @@
-const CACHE = "spines-and-spins-store-v4";
+const CACHE = "spines-and-spins-web-v5";
 
 const ASSETS = [
   "./",
@@ -10,10 +10,14 @@ const ASSETS = [
   "./privacy.html",
   "./terms.html",
   "./support.html",
-  "./style.css?v=store-v4",
-  "./app-v2.js?v=store-v4",
+  "./style.css?v=web-v5",
+  "./app-v2.js?v=web-v5",
   "./vendor/supabase.js",
   "./manifest.webmanifest",
+  "./pwa-icon-192.png",
+  "./pwa-icon-512.png",
+  "./pwa-icon-maskable-512.png",
+  "./apple-touch-icon.png",
   "./Portal.jpeg"
 ];
 
