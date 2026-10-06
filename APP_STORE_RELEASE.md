@@ -1,5 +1,7 @@
 # Spines & Spins App Store release
 
+Version 1.0.1 build 5 is currently Ready for Distribution. The October 2026 membership, reading-room, poll, message-deletion, and interaction-reliability update is prepared as version 1.0.2 build 6.
+
 The app code, iOS shell, cloud services, store metadata, subscriptions, privacy screens, account deletion flow, and community-safety controls are prepared. Version 1.0 build 3 was compiled, archived, App Store-signed, uploaded, processed, and attached to the App Store version on August 15, 2026. It includes the matched whole/genre library layout, cleaner interface copy, and the new burgundy-and-gold circle-of-books icon. Its Apple Distribution certificate and matching App Store provisioning profile are installed and valid through August 15, 2027.
 
 ## 1. Google Books — complete
@@ -31,9 +33,11 @@ supabase functions deploy revenuecat-webhook --no-verify-jwt
 
 Review `public.content_reports` at least daily while the user base is small. Respond promptly, remove violating content, and document the action. This operational step is part of Apple’s user-generated-content requirement.
 
-## 3. RevenueCat and subscriptions — submitted
+## 3. RevenueCat and subscriptions — App Store pricing updated
 
-RevenueCat app `appb44aab6308`, offering `spines_and_spins`, all products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. The subscription group and all three products—Library Legend Monthly, Shelf Enchanter Monthly, and Story Spinner Monthly—were submitted with iOS version 1.0 on August 16, 2026. Apple currently shows all of them as **Waiting for Review**.
+RevenueCat app `appb44aab6308`, offering `spines_and_spins`, products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. App Store Connect changes Story Spinner to $0.99/month and Shelf Enchanter to $2.99/month on October 7, 2026. RevenueCat Billing must use the same web prices. Remove Library Legend from the current offering/new sale while retaining its product-to-entitlement mapping for any existing subscribers.
+
+The new paywall has three visible choices: First Chapter (free), Story Spinner, and Shelf Enchanter. Genre themes remain available to everyone. The app no longer advertises unsupported custom branding, scheduled reminders, exports, or backup features.
 
 Before manually releasing the approved version, test purchase, cancellation, renewal, expiration, upgrade, downgrade, and Restore Purchases with an Apple sandbox account on a physical device.
 
@@ -51,8 +55,8 @@ The support and marketing URLs are saved on version 1.0, and the privacy-policy 
 
 - Bundle ID: `com.kayladeshasier.spinesandspins`
 - Apple app ID: `6797096355`
-- Version: `1.0`
-- Attached build: `3`
+- Current App Store version: `1.0.1` build `5`
+- Next release: `1.0.2` build `6`
 - App icon: `app-store-assets/app-icon-1024.png` (1024×1024 RGB, no transparency), bundled through the iOS AppIcon asset catalog.
 - Export compliance: the app declares that it does not use non-exempt encryption.
 - Age rating: answer for user-generated content and unrestricted web links accurately; do not place the app in the Kids category.

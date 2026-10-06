@@ -27,29 +27,35 @@ const SUBSCRIPTION_TIERS = {
     id: "first_chapter",
     name: "First Chapter",
     price: "Free",
-    clubLimit: 1,
-    bookLimit: 25,
+    clubLimit: 2,
+    bookLimit: 50,
+    memberLimit: 10,
+    showsAds: true,
     tagline: "A little magic to begin your reading world.",
-    features: ["1 club", "25 books", "Unlimited members", "Book and genre wheels", "Reading rooms and text discussions"]
+    features: ["2 clubs", "50 books across your clubs", "10 total members", "Book and genre wheels", "Reading rooms and text discussions", "Includes ads"]
   },
   story_spinner: {
     id: "story_spinner",
     name: "Story Spinner",
-    price: "$1.99/month",
+    price: "$0.99/month",
     clubLimit: 2,
     bookLimit: 100,
+    memberLimit: 20,
+    showsAds: false,
     tagline: "More room to spin, share, and discover.",
-    features: ["2 clubs", "100 books per club", "Member polls", "Voice notes", "Goodreads imports", "6 magical themes"]
+    features: ["2 clubs", "100 books across your clubs", "20 total members", "No ads", "Member polls and voice notes", "Goodreads imports"]
   },
   shelf_enchanter: {
     id: "shelf_enchanter",
     name: "Shelf Enchanter",
-    price: "$3.99/month",
-    clubLimit: 8,
-    bookLimit: 500,
+    price: "$2.99/month",
+    clubLimit: Infinity,
+    bookLimit: Infinity,
+    memberLimit: Infinity,
+    showsAds: false,
     featured: true,
     tagline: "Everything a devoted book-club host needs.",
-    features: ["8 clubs", "500 books per club", "Custom wheels", "Advanced voting", "Reading insights and recaps", "Imports, exports, and backups"]
+    features: ["Unlimited clubs", "Unlimited books", "Unlimited members", "No ads", "Member polls and voice notes", "Goodreads imports"]
   },
   library_legend: {
     id: "library_legend",
@@ -57,8 +63,11 @@ const SUBSCRIPTION_TIERS = {
     price: "$4.99/month",
     clubLimit: Infinity,
     bookLimit: Infinity,
-    tagline: "Your entire reading world, without limits.",
-    features: ["Unlimited clubs", "Unlimited books", "Custom club branding", "Advanced admin roles", "Scheduled reminders", "Early access to new magic"]
+    memberLimit: Infinity,
+    showsAds: false,
+    legacy: true,
+    tagline: "Legacy unlimited membership.",
+    features: ["Unlimited clubs", "Unlimited books", "Unlimited members", "No ads", "Member polls and voice notes", "Goodreads imports"]
   }
 };
 
@@ -113,6 +122,7 @@ let profile = null;
 let currentClub = null;
 let clubBooks = [];
 let currentClubPlan = SUBSCRIPTION_TIERS.first_chapter;
+let currentClubUsage = { bookCount: 0, memberCount: 0 };
 let revenueCatReady = false;
 let revenueCatOfferings = null;
 let deferredPwaInstallPrompt = null;
@@ -160,6 +170,18 @@ function friendlyNoticeMessage(value) {
 
   if (lower.includes("otp_expired") || lower.includes("token has expired") || lower.includes("invalid token")) {
     return "That password-reset link has expired. Return to sign in and request a new one.";
+  }
+
+  if (lower.includes("subscription_member_limit")) {
+    return "This club owner’s membership has reached its total reader limit. The owner can remove an inactive reader or choose a larger plan.";
+  }
+
+  if (lower.includes("subscription_book_limit")) {
+    return "This club owner’s membership has reached its total book limit. Remove a book or choose a larger plan to keep adding.";
+  }
+
+  if (lower.includes("subscription_limit")) {
+    return "This membership has reached one of its plan limits. The club owner can review the available plans for more room.";
   }
 
   return message;
@@ -468,6 +490,7 @@ function isOwner() {
 }
 
 async function initialize() {
+  bindReliableDialogDismissal();
   bindExternalLinks();
 
   const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
@@ -485,7 +508,9 @@ async function initialize() {
     }
 
     user = { id: "00000000-0000-4000-8000-000000000001", email: "reader@example.com" };
-    profile = { id: user.id, display_name: "Preview Reader", subscription_tier: "first_chapter" };
+    const previewTier = SUBSCRIPTION_TIERS[getParam("plan")] || SUBSCRIPTION_TIERS.first_chapter;
+    profile = { id: user.id, display_name: "Preview Reader", subscription_tier: previewTier.id };
+    currentClubPlan = previewTier;
     currentClub = {
       id: "preview-club",
       name: "Midnight Margins",
@@ -704,7 +729,7 @@ function activeTier() {
 }
 
 function tierRank(tierId) {
-  return ["first_chapter", "story_spinner", "shelf_enchanter", "library_legend"].indexOf(tierId);
+  return ({ first_chapter: 0, story_spinner: 1, shelf_enchanter: 2, library_legend: 2 })[tierId] ?? 0;
 }
 
 function clubIncludesTier(minimumTier) {
@@ -713,6 +738,55 @@ function clubIncludesTier(minimumTier) {
 
 function formatLimit(value) {
   return Number.isFinite(value) ? String(value) : "Unlimited";
+}
+
+function nextTierId(tierId) {
+  if (tierId === "first_chapter") return "story_spinner";
+  if (tierId === "story_spinner") return "shelf_enchanter";
+  return "shelf_enchanter";
+}
+
+function currentBookUsage() {
+  return Number(currentClubUsage?.bookCount || 0);
+}
+
+function remainingBookSlots() {
+  return Number.isFinite(currentClubPlan.bookLimit)
+    ? Math.max(0, currentClubPlan.bookLimit - currentBookUsage())
+    : Infinity;
+}
+
+function adPlacementMarkup(placement, plan = currentClubPlan) {
+  if (!plan.showsAds) return "";
+  return `
+    <aside class="ad-placement glass-panel" data-ad-placement="${escapeHtml(placement)}" aria-label="Advertisement">
+      <span class="ad-label">Advertisement</span>
+      <div class="ad-placeholder-copy">
+        <span class="ad-spark" aria-hidden="true">✦</span>
+        <div><strong>Turn the page without interruptions.</strong><p>Story Spinner removes ads and unlocks polls, voice notes, and Goodreads imports.</p></div>
+      </div>
+      <button class="text-button" type="button" data-open-ad-plans>Remove ads</button>
+    </aside>`;
+}
+
+function bindAdPlacements(root = document) {
+  $$('[data-open-ad-plans]', root).forEach(button => {
+    button.onclick = () => openPaywall({
+      reason: "Story Spinner removes ads and adds more ways for your club to read together.",
+      requiredTier: "story_spinner"
+    });
+  });
+}
+
+function bindReliableDialogDismissal() {
+  document.addEventListener("click", event => {
+    const target = event.target instanceof Element ? event.target : null;
+    const closeButton = target?.closest(".dialog-close");
+    const dialog = closeButton?.closest("dialog");
+    if (!dialog?.open) return;
+    event.preventDefault();
+    dialog.close();
+  }, true);
 }
 
 function revenueCatPlugin() {
@@ -1147,7 +1221,7 @@ function openPaywall({ reason = "", requiredTier = "" } = {}) {
           <p>${escapeHtml(reason || "Create more clubs, grow your shelves, and unlock more ways to read together.")}</p>
         </div>
         <div class="plan-grid">
-          ${Object.values(SUBSCRIPTION_TIERS).map(plan => planCardMarkup(plan)).join("")}
+          ${Object.values(SUBSCRIPTION_TIERS).filter(plan => !plan.legacy).map(plan => planCardMarkup(plan)).join("")}
         </div>
         <div class="paywall-footer">
           ${nativePlatform() === "web" ? "" : `<button class="text-button" id="restorePurchases" type="button">Restore purchases</button>`}
@@ -1806,9 +1880,26 @@ async function loadCurrentClub() {
     currentClubPlan = SUBSCRIPTION_TIERS.first_chapter;
   }
 
+  await refreshCurrentClubPlanUsage();
+
   localStorage.setItem(clubKey, currentClub.id);
 
   return currentClub;
+}
+
+async function refreshCurrentClubPlanUsage() {
+  if (!sb || !currentClub?.id) return currentClubUsage;
+  const { data, error } = await sb.rpc("get_club_plan_usage", {
+    target_club_id: currentClub.id
+  });
+  if (!error && data) {
+    currentClubUsage = {
+      bookCount: Number(data.book_count || 0),
+      memberCount: Number(data.member_count || 0)
+    };
+    currentClubPlan = SUBSCRIPTION_TIERS[data.tier] || currentClubPlan;
+  }
+  return currentClubUsage;
 }
 
 async function bootRoute() {
@@ -1896,6 +1987,8 @@ async function renderClubHub() {
       <span>Explore plans <b>→</b></span>
     </button>
 
+    ${adPlacementMarkup("club-hub", plan)}
+
     <section class="club-hero glass-panel">
       <div>
         <p class="eyebrow">Your bookish universe</p>
@@ -1938,6 +2031,7 @@ async function renderClubHub() {
   $("#createClub").onclick = () => openClubDialog();
   $("#joinClub").onclick = () => openJoinDialog();
   $("#openPlans").onclick = () => openPaywall();
+  bindAdPlacements(root);
 
   $$("[data-open-club]").forEach(button => {
     button.onclick = () => {
@@ -2259,7 +2353,7 @@ async function openClubDialog() {
   if (!countError && Number.isFinite(plan.clubLimit) && (count || 0) >= plan.clubLimit) {
     openPaywall({
       reason: `${plan.name} includes ${plan.clubLimit} club${plan.clubLimit === 1 ? "" : "s"}. Choose a new chapter to create another.`,
-      requiredTier: plan.id === "first_chapter" ? "story_spinner" : plan.id === "story_spinner" ? "shelf_enchanter" : "library_legend"
+      requiredTier: nextTierId(plan.id)
     });
     return;
   }
@@ -2458,6 +2552,8 @@ async function loadClubBooks() {
 
   clubBooks = data || [];
 
+  await refreshCurrentClubPlanUsage();
+
   return clubBooks;
 }
 
@@ -2621,6 +2717,7 @@ async function renderGenreWheel() {
 
   const reading = clubBooks.find(book => book.status === "reading");
   const genres = GENRES.filter(genre => enabledGenres().includes(genre.name));
+  const poll = await loadCurrentClubPoll();
 
   const shelfBook = (genre, index) => {
     const height = 152 + ((index * 19) % 58);
@@ -2661,6 +2758,8 @@ async function renderGenreWheel() {
   $("#app").innerHTML = `
     ${currentAdventureMarkup(reading)}
 
+    ${clubPollMarkup(poll)}
+
     <section class="genre-library glass-panel">
       <div class="genre-library-intro">
         <p class="eyebrow">The Spines &amp; Spins stacks</p>
@@ -2683,6 +2782,7 @@ async function renderGenreWheel() {
 
   $("#openLibraryBookEntry")?.addEventListener("click", openBookDialog);
   $("#openAllLibraryBooks")?.addEventListener("click", openAllLibraryDialog);
+  bindClubPollActions();
   if (reading) {
     hydrateMemberProgress(reading);
     hydrateCurrentAdventureUnread(reading);
@@ -2706,6 +2806,177 @@ async function renderGenreWheel() {
     });
   });
   $("#spinGenreShelf")?.addEventListener("click", () => spinGenreShelf(genres));
+}
+
+async function loadCurrentClubPoll() {
+  if (!clubIncludesTier("story_spinner")) return null;
+  if (!sb && getParam("preview")) {
+    return getParam("poll") === "1" ? {
+      id: "preview-poll",
+      question: "Which adventure should we read next?",
+      created_by: user.id,
+      votes: [
+        { option_id: "preview-poll-one", user_id: user.id },
+        { option_id: "preview-poll-one", user_id: "preview-reader-maya" },
+        { option_id: "preview-poll-two", user_id: "preview-reader-jordan" }
+      ],
+      options: [
+        { id: "preview-poll-one", label: "The Fellowship of the Ring", position: 1 },
+        { id: "preview-poll-two", label: "The Lion, the Witch and the Wardrobe", position: 2 },
+        { id: "preview-poll-three", label: "A Wrinkle in Time", position: 3 }
+      ]
+    } : null;
+  }
+  const { data: poll, error } = await sb
+    .from("club_polls")
+    .select("id,question,is_open,created_at,created_by")
+    .eq("club_id", currentClub.id)
+    .eq("is_open", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !poll) return null;
+
+  const [{ data: options }, { data: votes }] = await Promise.all([
+    sb.from("club_poll_options").select("id,label,position").eq("poll_id", poll.id).order("position"),
+    sb.from("club_poll_votes").select("option_id,user_id").eq("poll_id", poll.id)
+  ]);
+  return { ...poll, options: options || [], votes: votes || [] };
+}
+
+function clubPollMarkup(poll) {
+  if (!clubIncludesTier("story_spinner")) {
+    return `
+      <section class="club-poll glass-panel club-poll-locked">
+        <div><p class="eyebrow">Club pulse</p><h2>Let members vote together.</h2><p>Member polls begin with Story Spinner.</p></div>
+        ${isOwner() ? `<button class="secondary-button" type="button" data-open-poll-plans>Unlock polls</button>` : `<span class="poll-owner-note">Ask the club owner to unlock polls.</span>`}
+      </section>`;
+  }
+
+  if (!poll) {
+    return `
+      <section class="club-poll glass-panel club-poll-empty">
+        <div><p class="eyebrow">Club pulse</p><h2>No poll is open right now.</h2><p>${isAdmin() ? "Ask a question and let the whole club choose together." : "A club admin can open the next vote."}</p></div>
+        ${isAdmin() ? `<button class="secondary-button" type="button" data-create-poll>Create a poll</button>` : ""}
+      </section>`;
+  }
+
+  const totalVotes = poll.votes.length;
+  const selectedOptionId = poll.votes.find(vote => vote.user_id === user.id)?.option_id || "";
+  return `
+    <section class="club-poll glass-panel">
+      <div class="club-poll-heading">
+        <div><p class="eyebrow">Club pulse</p><h2>${escapeHtml(poll.question)}</h2><p>${totalVotes} vote${totalVotes === 1 ? "" : "s"} so far</p></div>
+        ${isAdmin() ? `<button class="text-button" type="button" data-close-poll="${poll.id}">Close poll</button>` : ""}
+      </div>
+      <div class="poll-options">
+        ${poll.options.map(option => {
+          const votes = poll.votes.filter(vote => vote.option_id === option.id).length;
+          const share = totalVotes ? Math.round(votes / totalVotes * 100) : 0;
+          return `
+            <button class="poll-option ${selectedOptionId === option.id ? "is-selected" : ""}" type="button" data-poll-option="${option.id}" data-poll-id="${poll.id}">
+              <span><strong>${escapeHtml(option.label)}</strong><small>${votes} vote${votes === 1 ? "" : "s"}</small></span>
+              <span class="poll-meter"><i style="--poll-share:${share}%"></i></span>
+            </button>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+function bindClubPollActions() {
+  $("[data-open-poll-plans]")?.addEventListener("click", () => openPaywall({
+    reason: "Member polls begin with Story Spinner.",
+    requiredTier: "story_spinner"
+  }));
+  $("[data-create-poll]")?.addEventListener("click", openCreatePollDialog);
+  $$('[data-poll-option]').forEach(button => {
+    button.onclick = async () => {
+      button.disabled = true;
+      const { error } = await sb.from("club_poll_votes").upsert({
+        poll_id: button.dataset.pollId,
+        option_id: button.dataset.pollOption,
+        user_id: user.id
+      }, { onConflict: "poll_id,user_id" });
+      if (error) {
+        button.disabled = false;
+        return alert(error.message);
+      }
+      await renderGenreWheel();
+    };
+  });
+  $("[data-close-poll]")?.addEventListener("click", async event => {
+    const confirmed = await prettyConfirm({
+      eyebrow: "Club pulse",
+      title: "Close this poll?",
+      message: "Members will no longer be able to vote. You can start a new poll afterward.",
+      confirmLabel: "Close poll"
+    });
+    if (!confirmed) return;
+    const { error } = await sb.from("club_polls").update({ is_open: false }).eq("id", event.currentTarget.dataset.closePoll);
+    if (error) return alert(error.message);
+    await renderGenreWheel();
+  });
+}
+
+function openCreatePollDialog() {
+  if (!clubIncludesTier("story_spinner")) {
+    openPaywall({ reason: "Member polls begin with Story Spinner.", requiredTier: "story_spinner" });
+    return;
+  }
+  if ($("#createPollDialog")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+    <dialog class="book-dialog" id="createPollDialog">
+      <form class="dialog-card" id="createPollForm">
+        <button class="dialog-close" type="button" aria-label="Close">×</button>
+        <p class="eyebrow">Club pulse</p>
+        <h2>Start a member poll</h2>
+        <label class="field-label" for="pollQuestion">Question</label>
+        <input id="pollQuestion" maxlength="180" required placeholder="What should we read next?">
+        <label class="field-label field-label-spaced" for="pollChoice1">Choices</label>
+        <div class="poll-choice-fields">
+          <input id="pollChoice1" maxlength="100" required placeholder="First choice">
+          <input id="pollChoice2" maxlength="100" required placeholder="Second choice">
+          <input id="pollChoice3" maxlength="100" placeholder="Third choice (optional)">
+          <input id="pollChoice4" maxlength="100" placeholder="Fourth choice (optional)">
+        </div>
+        <p class="field-help">Members can choose one answer and change their vote while the poll is open.</p>
+        <button class="primary-button full-button" type="submit">Open poll</button>
+      </form>
+    </dialog>`);
+
+  const dialog = $("#createPollDialog");
+  dialog.showModal();
+  $("#createPollForm", dialog).onsubmit = async event => {
+    event.preventDefault();
+    const submit = $('button[type="submit"]', dialog);
+    const choices = [1, 2, 3, 4]
+      .map(index => $(`#pollChoice${index}`, dialog).value.trim())
+      .filter(Boolean);
+    if (new Set(choices.map(choice => choice.toLowerCase())).size !== choices.length) {
+      return alert("Give each poll choice a different name.");
+    }
+    submit.disabled = true;
+    const { data: poll, error } = await sb.from("club_polls").insert({
+      club_id: currentClub.id,
+      created_by: user.id,
+      question: $("#pollQuestion", dialog).value.trim()
+    }).select("id").single();
+    if (error) {
+      submit.disabled = false;
+      return alert(error.message);
+    }
+    const { error: optionError } = await sb.from("club_poll_options").insert(
+      choices.map((label, index) => ({ poll_id: poll.id, label, position: index + 1 }))
+    );
+    if (optionError) {
+      await sb.from("club_polls").delete().eq("id", poll.id);
+      submit.disabled = false;
+      return alert(optionError.message);
+    }
+    dialog.close();
+    await renderGenreWheel();
+  };
+  dialog.addEventListener("close", () => dialog.remove());
 }
 
 function currentAdventureMarkup(book) {
@@ -3782,10 +4053,10 @@ function activeGenres() {
 }
 
 function openBookDialog(defaultGenre) {
-  if (Number.isFinite(currentClubPlan.bookLimit) && clubBooks.length >= currentClubPlan.bookLimit) {
+  if (remainingBookSlots() <= 0) {
     openPaywall({
-      reason: `${currentClubPlan.name} shelves hold ${currentClubPlan.bookLimit} books per owned club. The owner can choose a new chapter to keep adding.`,
-      requiredTier: currentClubPlan.id === "first_chapter" ? "story_spinner" : currentClubPlan.id === "story_spinner" ? "shelf_enchanter" : "library_legend"
+      reason: `${currentClubPlan.name} includes ${currentClubPlan.bookLimit} books across the owner’s clubs. The owner can choose a larger plan to keep adding.`,
+      requiredTier: nextTierId(currentClubPlan.id)
     });
     return;
   }
@@ -4540,10 +4811,10 @@ async function saveBook(book, confirmDialog, outerDialog, options = {}) {
     return alert("Please enter a title.");
   }
 
-  if (Number.isFinite(currentClubPlan.bookLimit) && clubBooks.length >= currentClubPlan.bookLimit) {
+  if (remainingBookSlots() <= 0) {
     confirmDialog?.close();
     outerDialog?.close();
-    openPaywall({ reason: `This club has filled all ${currentClubPlan.bookLimit} shelves included with ${currentClubPlan.name}.` });
+    openPaywall({ reason: `The owner’s clubs have used all ${currentClubPlan.bookLimit} books included with ${currentClubPlan.name}.`, requiredTier: nextTierId(currentClubPlan.id) });
     return;
   }
 
@@ -4755,14 +5026,14 @@ async function importGoodreadsFile(dialog) {
   }
 
   if (Number.isFinite(currentClubPlan.bookLimit)) {
-    const remaining = Math.max(0, currentClubPlan.bookLimit - clubBooks.length);
+    const remaining = remainingBookSlots();
     if (!remaining) {
       dialog.close();
-      openPaywall({ reason: `This club has filled all ${currentClubPlan.bookLimit} shelves included with ${currentClubPlan.name}.` });
+      openPaywall({ reason: `The owner’s clubs have used all ${currentClubPlan.bookLimit} books included with ${currentClubPlan.name}.`, requiredTier: nextTierId(currentClubPlan.id) });
       return;
     }
     if (usable.length > remaining) {
-      result.innerHTML = `<p class="empty-note">Your file contains ${usable.length} books, but this club has room for ${remaining}. Upgrade the owner’s plan to import the full library.</p>`;
+      result.innerHTML = `<p class="empty-note">Your file contains ${usable.length} books, but the owner’s plan has room for ${remaining} more across all owned clubs. Upgrade the owner’s plan to import the full library.</p>`;
       return;
     }
   }
@@ -5024,12 +5295,15 @@ async function renderBookRoom() {
         <div class="button-row book-links">
           <a class="secondary-button" target="_blank" rel="noopener" href="${escapeHtml(book.google_info_link || googleBooksSearchLink(book))}">View on Google Books</a>
           <a class="primary-button" target="_blank" rel="noopener" href="${escapeHtml(amazonSearchLink(book))}">Search Amazon</a>
+          <a class="secondary-button audible-button" target="_blank" rel="noopener" href="${escapeHtml(audibleSearchLink(book))}">Search Audible</a>
           ${isAdmin() ? `<button class="text-button book-genre-edit-button" id="editBookGenres" type="button">Edit genres</button>` : ""}
           ${isOwner() && book.status === "reading" ? `<button class="secondary-button" id="returnAdventureToShelf">Return to shelf</button><button class="text-button danger-button" id="removeAdventureFromLibrary">Remove from library</button>` : ""}
         </div>
         ${warningReaders.length ? `<div class="tw-reader-note"><span class="tw-badge">TW</span><span>Flagged by ${warningReaders.map(update => `<strong>${escapeHtml(update.display_name || "Bookish Reader")}</strong>`).join(", ")}</span></div>` : ""}
       </div>
     </section>
+
+    ${adPlacementMarkup("reading-room")}
 
     <section class="chapters-section glass-panel">
       <div class="section-heading"><div><p class="eyebrow">Spoiler-safe reading room</p><h2>Chapters &amp; group notes</h2><p>Each chapter opens its own conversation. Voice notes stay with the chapter too.</p></div><div class="chapter-section-actions"><button id="openAllMessages" class="secondary-button">View all messages</button>${isAdmin() ? `<button id="setChapters" class="secondary-button">${chapters?.length ? "Edit chapters" : "Add chapters"}</button>` : ""}</div></div>
@@ -5044,6 +5318,7 @@ async function renderBookRoom() {
     ${readingUpdateMarkup}`;
 
   bindClubTools();
+  bindAdPlacements($("#app"));
 
   let inlineRating = selectedRating;
   const paintInlineHearts = () => {
@@ -5192,6 +5467,11 @@ function amazonSearchLink(book) {
     `${book.title} ${(book.authors || []).join(" ")}`;
 
   return `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
+}
+
+function audibleSearchLink(book) {
+  const query = `${book.title} ${(book.authors || []).join(" ")}`.trim();
+  return `https://www.audible.com/search?keywords=${encodeURIComponent(query)}`;
 }
 
 function chapterCard(chapter) {
@@ -5669,7 +5949,7 @@ function allChapterMessageCard(message) {
   const name = message.profiles?.display_name || "Bookish Reader";
   const time = new Date(message.created_at).toLocaleString();
   return `
-    <article class="chapter-message all-chapter-message" data-message-author="${message.author_id || ""}">
+    <article class="chapter-message all-chapter-message" data-message-id="${message.id || ""}" data-message-author="${message.author_id || ""}">
       <p class="message-chapter-label">${escapeHtml(chapterName)}</p>
       <header>
         <strong>${escapeHtml(name)}</strong>
@@ -5688,7 +5968,7 @@ function messageCard(message) {
   const time = new Date(message.created_at).toLocaleString();
 
   return `
-    <article class="chapter-message" data-message-author="${message.author_id || ""}">
+    <article class="chapter-message" data-message-id="${message.id || ""}" data-message-author="${message.author_id || ""}">
       <header>
         <strong>${escapeHtml(name)}</strong>
         <small>${escapeHtml(time)}</small>
@@ -5715,7 +5995,13 @@ function chapterMessageReactionMarkup(message) {
 }
 
 function messageSafetyMarkup(message) {
-  if (!message?.id || !message?.author_id || message.author_id === user?.id) return "";
+  if (!message?.id || !message?.author_id) return "";
+  if (message.author_id === user?.id) {
+    return `
+      <footer class="message-safety-actions message-owner-actions">
+        <button class="message-delete" type="button" data-delete-message="${message.id}" data-audio-path="${escapeHtml(message.audio_path || "")}">Delete</button>
+      </footer>`;
+  }
   return `
     <footer class="message-safety-actions">
       <button type="button" data-report-message="${message.id}" data-reported-user="${message.author_id}">Report</button>
@@ -5724,6 +6010,44 @@ function messageSafetyMarkup(message) {
 }
 
 function bindMessageSafetyActions(root) {
+  $$('[data-delete-message]', root).forEach(button => {
+    button.onclick = async () => {
+      const confirmed = await prettyConfirm({
+        eyebrow: "Your chapter note",
+        title: "Delete this message?",
+        message: "This permanently removes the message from the chapter conversation.",
+        confirmLabel: "Delete message",
+        danger: true
+      });
+      if (!confirmed) return;
+
+      button.disabled = true;
+      const { data, error } = await sb
+        .from("chapter_messages")
+        .delete()
+        .eq("id", button.dataset.deleteMessage)
+        .eq("author_id", user.id)
+        .select("id")
+        .maybeSingle();
+
+      if (error || !data) {
+        button.disabled = false;
+        return alert(error?.message || "This message could not be deleted. Please refresh and try again.");
+      }
+
+      const audioPath = button.dataset.audioPath;
+      if (audioPath) {
+        const { error: audioError } = await sb.storage.from("chapter-audio").remove([audioPath]);
+        if (audioError) console.warn("The message was deleted, but its audio file cleanup will be retried later:", audioError);
+      }
+
+      button.closest(".chapter-message")?.remove();
+      const thread = $(".message-thread", root);
+      if (thread && !$(".chapter-message", thread)) {
+        thread.innerHTML = `<p class="empty-note">No chapter messages have been posted yet.</p>`;
+      }
+    };
+  });
   $$('[data-report-message]', root).forEach(button => {
     button.onclick = () => openReportContentDialog(
       button.dataset.reportMessage,

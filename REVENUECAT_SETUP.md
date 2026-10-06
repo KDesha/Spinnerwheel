@@ -13,11 +13,19 @@ The application code and database limits are ready for RevenueCat, but live purc
 
 | Level | Subscription | Product ID | Apple ID | U.S. price |
 |---:|---|---|---|---:|
-| 1 | Library Legend Monthly | `spines_and_spins_library_legend_monthly` | `6797097051` | $4.99 |
-| 2 | Shelf Enchanter Monthly | `spines_and_spins_shelf_enchanter_monthly` | `6797097552` | $3.99 |
-| 3 | Story Spinner Monthly | `spines_and_spins_story_spinner_monthly` | `6797097945` | $1.99 |
+| Legacy | Library Legend Monthly | `spines_and_spins_library_legend_monthly` | `6797097051` | $4.99 |
+| 1 | Shelf Enchanter Monthly | `spines_and_spins_shelf_enchanter_monthly` | `6797097552` | $2.99 |
+| 2 | Story Spinner Monthly | `spines_and_spins_story_spinner_monthly` | `6797097945` | $0.99 |
 
-All three subscriptions have English (U.S.) localizations, one-month durations, worldwide availability (including future storefronts), and Apple-generated local prices. Family Sharing is off. They remain in **Prepare for Submission** and have not been added for review.
+Shelf Enchanter and Story Spinner are the two plans offered to new customers. Library Legend remains mapped as a legacy entitlement so existing subscribers keep unlimited access; remove it from new sale only after confirming Apple’s subscriber-retention behavior. All products use one-month durations and Family Sharing is off.
+
+The in-app plan limits are:
+
+- First Chapter (free): 2 clubs, 50 books across owned clubs, 10 distinct members across owned clubs, and ads.
+- Story Spinner ($0.99/month): 2 clubs, 100 books across owned clubs, 20 distinct members, no ads, member polls, voice notes, and Goodreads imports.
+- Shelf Enchanter ($2.99/month): unlimited clubs, books, and members, no ads, member polls, voice notes, and Goodreads imports.
+
+Genre themes are available to every plan and are not a subscription entitlement.
 
 ## RevenueCat catalog
 
@@ -25,9 +33,9 @@ Create one offering named `spines_and_spins` with these monthly products and ent
 
 | Product ID | Entitlement ID | Price |
 |---|---|---:|
-| `spines_and_spins_story_spinner_monthly` | `story_spinner` | $1.99 |
-| `spines_and_spins_shelf_enchanter_monthly` | `shelf_enchanter` | $3.99 |
-| `spines_and_spins_library_legend_monthly` | `library_legend` | $4.99 |
+| `spines_and_spins_story_spinner_monthly` | `story_spinner` | $0.99 |
+| `spines_and_spins_shelf_enchanter_monthly` | `shelf_enchanter` | $2.99 |
+| `spines_and_spins_library_legend_monthly` | `library_legend` | $4.99 legacy only |
 
 Use the signed-in Supabase UUID as RevenueCat's App User ID. This is already done by `initializeRevenueCat()`.
 
@@ -58,12 +66,12 @@ RevenueCat project-owner access is required for the first two steps. The current
 
 1. In RevenueCat, open **Web** and connect the production Stripe account to RevenueCat Billing.
 2. Add a RevenueCat Billing web configuration.
-3. Create these monthly web products with the same identifiers and prices used by the app:
-   - `spines_and_spins_story_spinner_monthly` — $1.99
-   - `spines_and_spins_shelf_enchanter_monthly` — $3.99
-   - `spines_and_spins_library_legend_monthly` — $4.99
+3. Create or update these monthly web products with the same identifiers and prices used by the app:
+   - `spines_and_spins_story_spinner_monthly` — $0.99
+   - `spines_and_spins_shelf_enchanter_monthly` — $2.99
+   - Keep `spines_and_spins_library_legend_monthly` available only to existing legacy subscribers.
 4. Attach the products to the existing `story_spinner`, `shelf_enchanter`, and `library_legend` entitlements.
-5. Add the web products to offering `spines_and_spins`. Use package identifiers `story_spinner`, `shelf_enchanter`, and `library_legend`; the browser paywall sends that identifier as `package_id`.
+5. Add Story Spinner and Shelf Enchanter to offering `spines_and_spins`. Use package identifiers `story_spinner` and `shelf_enchanter`; the browser paywall sends that identifier as `package_id`. Remove Library Legend from the current offering without deleting its entitlement mapping.
 6. Under **Funnels → Purchase Links**, create a hosted Web Purchase Link for that offering. Require an identified customer; the app appends the signed-in Supabase UUID and email to the checkout URL.
 7. Set the purchase-link success redirect to `https://spinesandspins.netlify.app/club.html?checkout=complete`. This lets the app wait for the existing RevenueCat webhook and confirm the new membership.
 8. The production link base, `https://pay.rev.cat/hdkxpnasozwaokez`, is configured as `REVENUECAT_WEB_PURCHASE_LINK` near the top of `app-v2.js`. The link is a public checkout identifier, not a secret API key.

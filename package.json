@@ -1,12 +1,13 @@
 {
   "name": "spines-and-spins",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "A whimsical book-club spinner for iOS and Android.",
   "scripts": {
     "build:web": "node scripts/build-web.mjs",
     "serve": "python3 -m http.server 4189 --bind 127.0.0.1 --directory www",
     "release:check": "npm run build:web && node --check app-v2.js && node scripts/release-check.mjs",
+    "demo:seed-hobbit": "node scripts/seed-hobbit-demo.mjs",
     "sync:ios": "npm run build:web && npx cap sync ios",
     "open:ios": "npm run sync:ios && npx cap open ios",
     "run:ios": "npm run sync:ios && npx cap run ios"

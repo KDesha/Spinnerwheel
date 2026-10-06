@@ -1,4 +1,4 @@
-const CACHE = "spines-and-spins-web-v5";
+const CACHE = "spines-and-spins-web-v6";
 
 const ASSETS = [
   "./",
@@ -10,8 +10,8 @@ const ASSETS = [
   "./privacy.html",
   "./terms.html",
   "./support.html",
-  "./style.css?v=web-v5",
-  "./app-v2.js?v=web-v5",
+  "./style.css?v=web-v6",
+  "./app-v2.js?v=web-v6",
   "./vendor/supabase.js",
   "./manifest.webmanifest",
   "./pwa-icon-192.png",
