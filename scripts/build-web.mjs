@@ -15,7 +15,7 @@ const supabaseBrowserBundle = path.join(
   "umd",
   "supabase.js"
 );
-const webAssetPattern = /\.(?:html|css|js|webmanifest|jpe?g|png|webp|gif|svg)$/i;
+const webAssetPattern = /\.(?:html|css|js|txt|webmanifest|jpe?g|png|webp|gif|svg)$/i;
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
