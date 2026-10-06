@@ -37,6 +37,13 @@ Create one offering named `spines_and_spins` with these monthly products and ent
 | `spines_and_spins_shelf_enchanter_monthly` | `shelf_enchanter` | $2.99 |
 | `spines_and_spins_library_legend_monthly` | `library_legend` | $4.99 legacy only |
 
+RevenueCat Billing prices cannot be edited after a web product is created. The October 2026 web-price decrease therefore uses replacement products while the original products remain available only for existing subscriptions:
+
+| Web product ID | Entitlement ID | Price |
+|---|---|---:|
+| `spines_and_spins_story_spinner_monthly_099` | `story_spinner` | $0.99 |
+| `spines_and_spins_shelf_enchanter_monthly_299` | `shelf_enchanter` | $2.99 |
+
 Use the signed-in Supabase UUID as RevenueCat's App User ID. This is already done by `initializeRevenueCat()`.
 
 ## Native app
@@ -58,23 +65,18 @@ When the Capacitor shell is added:
 
 Never put the RevenueCat secret API key, webhook authorization value, or Supabase service-role key in `app-v2.js`.
 
-## Web/Android PWA checkout
+## Web/Android PWA checkout — configured
 
 The Android quick-launch version is the Netlify-hosted web app, installed from Chrome. It uses RevenueCat Billing with Stripe rather than Apple or Google Play billing. The iOS code path remains unchanged.
 
-RevenueCat project-owner access is required for the first two steps. The currently signed-in dashboard user can view the project but does not have permission to add web app configurations.
-
 1. In RevenueCat, open **Web** and connect the production Stripe account to RevenueCat Billing.
 2. Add a RevenueCat Billing web configuration.
-3. Create or update these monthly web products with the same identifiers and prices used by the app:
-   - `spines_and_spins_story_spinner_monthly` — $0.99
-   - `spines_and_spins_shelf_enchanter_monthly` — $2.99
-   - Keep `spines_and_spins_library_legend_monthly` available only to existing legacy subscribers.
-4. Attach the products to the existing `story_spinner`, `shelf_enchanter`, and `library_legend` entitlements.
-5. Add Story Spinner and Shelf Enchanter to offering `spines_and_spins`. Use package identifiers `story_spinner` and `shelf_enchanter`; the browser paywall sends that identifier as `package_id`. Remove Library Legend from the current offering without deleting its entitlement mapping.
+3. Use `spines_and_spins_story_spinner_monthly_099` at $0.99 and `spines_and_spins_shelf_enchanter_monthly_299` at $2.99 for new web customers. Retain the old web products for existing subscriptions.
+4. Attach the replacement products to the existing `story_spinner` and `shelf_enchanter` entitlements.
+5. The active offering `spines_and_spins` uses package identifiers `story_spinner` and `shelf_enchanter`; the browser paywall sends that identifier as `package_id`. Library Legend is no longer in the offering, but its product and entitlement mapping are retained for existing subscribers.
 6. Under **Funnels → Purchase Links**, create a hosted Web Purchase Link for that offering. Require an identified customer; the app appends the signed-in Supabase UUID and email to the checkout URL.
 7. Set the purchase-link success redirect to `https://spinesandspins.netlify.app/club.html?checkout=complete`. This lets the app wait for the existing RevenueCat webhook and confirm the new membership.
 8. The production link base, `https://pay.rev.cat/hdkxpnasozwaokez`, is configured as `REVENUECAT_WEB_PURCHASE_LINK` near the top of `app-v2.js`. The link is a public checkout identifier, not a secret API key.
-9. Test the RevenueCat sandbox link and webhook with a test account. Then verify one production purchase, renewal, cancellation, expiration, and plan change before sharing the Android install URL broadly.
+9. The public checkout was verified to show $0.99 for Story Spinner and $2.99 for Shelf Enchanter. Test a full sandbox purchase and webhook, then verify one production purchase, renewal, cancellation, expiration, and plan change before sharing the Android install URL broadly.
 
 RevenueCat Billing sends confirmation and renewal emails containing a secure customer-portal link. Android/web customers use that portal to update payment details, download receipts, change an eligible plan, or cancel.

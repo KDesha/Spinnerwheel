@@ -35,7 +35,7 @@ Review `public.content_reports` at least daily while the user base is small. Res
 
 ## 3. RevenueCat and subscriptions — App Store pricing updated
 
-RevenueCat app `appb44aab6308`, offering `spines_and_spins`, products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. App Store Connect changes Story Spinner to $0.99/month and Shelf Enchanter to $2.99/month on October 7, 2026. RevenueCat Billing must use the same web prices. Remove Library Legend from the current offering/new sale while retaining its product-to-entitlement mapping for any existing subscribers.
+RevenueCat app `appb44aab6308`, offering `spines_and_spins`, products, entitlements, Apple credentials, Supabase secrets, and the authenticated webhook are configured. App Store Connect changes Story Spinner to $0.99/month and Shelf Enchanter to $2.99/month on October 7, 2026. RevenueCat Billing uses matching $0.99 and $2.99 replacement web products. Library Legend has been removed from the active offering while its product-to-entitlement mapping remains for existing subscribers.
 
 The new paywall has three visible choices: First Chapter (free), Story Spinner, and Shelf Enchanter. Genre themes remain available to everyone. The app no longer advertises unsupported custom branding, scheduled reminders, exports, or backup features.
 
