@@ -1,6 +1,6 @@
 # Spines & Spins App Store release
 
-Version 1.0.1 build 5 is currently Ready for Distribution. The October 2026 membership, reading-room, poll, message-deletion, and interaction-reliability update is prepared as version 1.0.2 build 6.
+Version 1.0.1 build 5 is currently Ready for Distribution. The October 2026 membership, reading-room, poll, message-deletion, and interaction-reliability update was submitted as version 1.0.2 build 6 and is Waiting for Review.
 
 The app code, iOS shell, cloud services, store metadata, subscriptions, privacy screens, account deletion flow, and community-safety controls are prepared. Version 1.0 build 3 was compiled, archived, App Store-signed, uploaded, processed, and attached to the App Store version on August 15, 2026. It includes the matched whole/genre library layout, cleaner interface copy, and the new burgundy-and-gold circle-of-books icon. Its Apple Distribution certificate and matching App Store provisioning profile are installed and valid through August 15, 2027.
 
@@ -56,7 +56,7 @@ The support and marketing URLs are saved on version 1.0, and the privacy-policy 
 - Bundle ID: `com.kayladeshasier.spinesandspins`
 - Apple app ID: `6797096355`
 - Current App Store version: `1.0.1` build `5`
-- Next release: `1.0.2` build `6`
+- Submitted release: `1.0.2` build `6` — Waiting for Review
 - App icon: `app-store-assets/app-icon-1024.png` (1024×1024 RGB, no transparency), bundled through the iOS AppIcon asset catalog.
 - Export compliance: the app declares that it does not use non-exempt encryption.
 - Age rating: answer for user-generated content and unrestricted web links accurately; do not place the app in the Kids category.
@@ -66,6 +66,7 @@ The support and marketing URLs are saved on version 1.0, and the privacy-policy 
 - The app is set to Free, public distribution in 174 countries or regions, and manual release after approval. China mainland is excluded; App Store Connect shows its removal as processing.
 - Content Rights is complete with the account holder's attestation that the app has the necessary rights to access its third-party content.
 - App Review submission `9803b2e0-240b-4f89-adc1-b4abe24c26f3` includes five items: iOS version 1.0 build 3, the Spines & Spins Membership subscription group, and all three monthly subscriptions. Every item is **Waiting for Review** as of August 16, 2026.
+- The October 6, 2026 submission contains three items: iOS version 1.0.2 build 6 plus the updated Story Spinner and Shelf Enchanter subscription descriptions. App Store Connect reports **Waiting for Review** and keeps manual release enabled.
 
 ## 6. Final commands
 
@@ -75,6 +76,6 @@ npm run release:check
 npm run sync:ios
 ```
 
-These checks passed, including a Release simulator build, build 3 device archive, valid Apple Distribution signature, the embedded `Spines and Spins App Store 2026` provisioning profile, App Store Connect upload validation, and build processing. Build 3 is attached to version 1.0 and was submitted with its subscription group and three products. The release remains manual, so approval will not publish the app until the account holder chooses to release it.
+These checks passed for version 1.0.2 build 6, including the Release simulator build, device archive, Apple Distribution export, App Store Connect validation and upload, and build processing. Build 6 is attached to version 1.0.2 and submitted with the two updated paid-tier descriptions. The release remains manual, so approval will not publish the app until the account holder chooses to release it.
 
 Amazon Associates is not required. The app intentionally generates a normal Amazon search URL without an affiliate tag and does not claim an affiliate relationship.
