@@ -8,6 +8,7 @@ const AUTH_ATTEMPT_STORAGE_KEY = "spinesAndSpinsAuthAttemptGuard";
 const PASSWORD_RESET_STORAGE_KEY = "spinesAndSpinsPasswordResetGuard";
 const PWA_INSTALL_DISMISSED_STORAGE_KEY = "spinesAndSpinsPwaInstallDismissed";
 const PENDING_WEB_PURCHASE_STORAGE_KEY = "spinesAndSpinsPendingWebPurchase";
+const ADMOB_TEST_MODE_STORAGE_KEY = "spinesAndSpinsAdMobTestMode";
 const SIGN_IN_FAILURE_LIMIT = 3;
 const SIGN_IN_COOLDOWN_MS = 30_000;
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
@@ -21,6 +22,8 @@ const REVENUECAT_OFFERING_ID = "spines_and_spins";
 // Public RevenueCat Web Purchase Link base. The signed-in Supabase user ID
 // and selected package are appended when browser checkout begins.
 const REVENUECAT_WEB_PURCHASE_LINK = "https://pay.rev.cat/hdkxpnasozwaokez";
+const ADMOB_IOS_BANNER_AD_UNIT_ID = "ca-app-pub-5084669394228535/7336446333";
+const ADMOB_IOS_TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/2934735716";
 
 const SUBSCRIPTION_TIERS = {
   first_chapter: {
@@ -125,6 +128,14 @@ let currentClubPlan = SUBSCRIPTION_TIERS.first_chapter;
 let currentClubUsage = { bookCount: 0, memberCount: 0 };
 let revenueCatReady = false;
 let revenueCatOfferings = null;
+let adMobInitialized = false;
+let adMobBannerVisible = false;
+let adMobBannerListenersReady = false;
+let adMobPrivacyOptionsRequired = false;
+let adMobSyncChain = Promise.resolve();
+let adMobSyncTimer = null;
+let adMobObserver = null;
+let adMobRetryAfter = 0;
 let deferredPwaInstallPrompt = null;
 let rotation = 0;
 let spinning = false;
@@ -492,6 +503,7 @@ function isOwner() {
 async function initialize() {
   bindReliableDialogDismissal();
   bindExternalLinks();
+  observeAdMobEligibility();
 
   const localPreview = ["localhost", "127.0.0.1"].includes(location.hostname)
     ? getParam("preview")
@@ -611,6 +623,7 @@ async function initialize() {
 
   updateNav();
   await bootRoute();
+  scheduleAdMobBannerSync();
   reconcileCompletedWebCheckout().catch(error => {
     console.warn("Web purchase reconciliation was skipped:", error);
   });
@@ -776,6 +789,7 @@ function bindAdPlacements(root = document) {
       requiredTier: "story_spinner"
     });
   });
+  scheduleAdMobBannerSync();
 }
 
 function bindReliableDialogDismissal() {
@@ -795,6 +809,155 @@ function revenueCatPlugin() {
 
 function nativePlatform() {
   return window.Capacitor?.getPlatform?.() || "web";
+}
+
+function adMobPlugin() {
+  return window.Capacitor?.Plugins?.AdMob || null;
+}
+
+function adMobTestModeEnabled() {
+  const querySetting = getParam("adTest");
+  if (querySetting === "1") {
+    localStorage.setItem(ADMOB_TEST_MODE_STORAGE_KEY, "true");
+  } else if (querySetting === "0") {
+    localStorage.removeItem(ADMOB_TEST_MODE_STORAGE_KEY);
+  }
+  return localStorage.getItem(ADMOB_TEST_MODE_STORAGE_KEY) === "true";
+}
+
+function setAdMobLayoutInset(height = 0) {
+  const bannerHeight = Math.max(0, Number(height) || 0);
+  document.documentElement.style.setProperty("--admob-banner-height", `${bannerHeight}px`);
+  document.body.classList.toggle("admob-banner-visible", bannerHeight > 0);
+}
+
+async function registerAdMobBannerListeners(adMob) {
+  if (adMobBannerListenersReady) return;
+
+  await Promise.all([
+    adMob.addListener("bannerAdSizeChanged", size => {
+      setAdMobLayoutInset(size?.height);
+    }),
+    adMob.addListener("bannerAdLoaded", () => {
+      if (!document.body.classList.contains("admob-banner-visible")) {
+        setAdMobLayoutInset(50);
+      }
+    }),
+    adMob.addListener("bannerAdFailedToLoad", error => {
+      adMobBannerVisible = false;
+      setAdMobLayoutInset(0);
+      console.warn("The AdMob banner could not load:", error);
+    })
+  ]);
+
+  adMobBannerListenersReady = true;
+}
+
+async function ensureAdMobCanRequestAds() {
+  const adMob = adMobPlugin();
+  if (!adMob || nativePlatform() !== "ios") return false;
+
+  if (!adMobInitialized) {
+    await registerAdMobBannerListeners(adMob);
+    await adMob.initialize();
+    adMobInitialized = true;
+  }
+
+  let consentInfo = await adMob.requestConsentInfo({
+    tagForUnderAgeOfConsent: false
+  });
+
+  if (consentInfo?.isConsentFormAvailable && consentInfo.status === "REQUIRED") {
+    consentInfo = await adMob.showConsentForm();
+  }
+
+  adMobPrivacyOptionsRequired = consentInfo?.privacyOptionsRequirementStatus === "REQUIRED";
+  return Boolean(consentInfo?.canRequestAds);
+}
+
+function shouldShowAdMobBanner() {
+  return nativePlatform() === "ios" &&
+    Boolean(user) &&
+    activeTier().showsAds &&
+    Boolean(document.querySelector("[data-ad-placement]"));
+}
+
+async function syncAdMobBanner() {
+  const adMob = adMobPlugin();
+  if (!adMob || nativePlatform() !== "ios") return;
+
+  if (!shouldShowAdMobBanner()) {
+    try {
+      await adMob.removeBanner();
+    } catch (error) {
+      // Removing an absent banner is safe and expected during navigation.
+    }
+    adMobBannerVisible = false;
+    setAdMobLayoutInset(0);
+    return;
+  }
+
+  if (adMobBannerVisible || Date.now() < adMobRetryAfter) return;
+  if (!(await ensureAdMobCanRequestAds())) {
+    adMobRetryAfter = Date.now() + 60_000;
+    return;
+  }
+
+  const isTesting = adMobTestModeEnabled();
+  await adMob.showBanner({
+    adId: isTesting ? ADMOB_IOS_TEST_BANNER_AD_UNIT_ID : ADMOB_IOS_BANNER_AD_UNIT_ID,
+    adSize: "ADAPTIVE_BANNER",
+    position: "BOTTOM_CENTER",
+    margin: 0,
+    isTesting,
+    npa: true
+  });
+  adMobBannerVisible = true;
+}
+
+function scheduleAdMobBannerSync() {
+  adMobSyncChain = adMobSyncChain
+    .then(() => syncAdMobBanner())
+    .catch(error => {
+      adMobBannerVisible = false;
+      adMobRetryAfter = Date.now() + 60_000;
+      setAdMobLayoutInset(0);
+      console.warn("AdMob is not ready yet:", error);
+    });
+}
+
+function observeAdMobEligibility() {
+  if (nativePlatform() !== "ios" || !adMobPlugin() || adMobObserver) return;
+
+  adMobObserver = new MutationObserver(() => {
+    clearTimeout(adMobSyncTimer);
+    adMobSyncTimer = setTimeout(scheduleAdMobBannerSync, 80);
+  });
+  adMobObserver.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("pagehide", () => {
+    adMobPlugin()?.removeBanner().catch(() => {});
+  }, { once: true });
+  scheduleAdMobBannerSync();
+}
+
+async function showAdPrivacyOptions() {
+  const adMob = adMobPlugin();
+  if (!adMob || nativePlatform() !== "ios") return;
+
+  try {
+    const consentInfo = await adMob.requestConsentInfo({
+      tagForUnderAgeOfConsent: false
+    });
+    adMobPrivacyOptionsRequired = consentInfo?.privacyOptionsRequirementStatus === "REQUIRED";
+    if (!adMobPrivacyOptionsRequired) {
+      return alert("Your current privacy choices do not require an additional ad settings form.");
+    }
+    await adMob.showPrivacyOptionsForm();
+    scheduleAdMobBannerSync();
+  } catch (error) {
+    console.warn("Ad privacy choices could not be opened:", error);
+    alert("Ad privacy choices are unavailable right now. Please try again later.");
+  }
 }
 
 function nativeBrowserPlugin() {
@@ -1008,6 +1171,7 @@ function openAccountMenu() {
           <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>
           <a href="terms.html" target="_blank" rel="noopener">Terms of use</a>
           ${subscriptionManagementMarkup()}
+          ${nativePlatform() === "ios" && adMobPrivacyOptionsRequired ? `<button class="text-button" id="adPrivacyChoices" type="button">Ad privacy choices</button>` : ""}
           <button class="text-button" id="manageBlockedReaders" type="button">Blocked readers</button>
           <button class="text-button danger-link" id="deleteAccount" type="button">Delete account</button>
         </div>
@@ -1064,6 +1228,11 @@ function openAccountMenu() {
     dialog.close();
     openBlockedReadersDialog();
   };
+
+  const adPrivacyChoices = $("#adPrivacyChoices", dialog);
+  if (adPrivacyChoices) {
+    adPrivacyChoices.onclick = () => showAdPrivacyOptions();
+  }
 
   dialog.addEventListener("close", () => dialog.remove());
 }
@@ -5303,7 +5472,7 @@ async function renderBookRoom() {
       </div>
     </section>
 
-    ${adPlacementMarkup("reading-room")}
+    ${adPlacementMarkup("reading-room", activeTier())}
 
     <section class="chapters-section glass-panel">
       <div class="section-heading"><div><p class="eyebrow">Spoiler-safe reading room</p><h2>Chapters &amp; group notes</h2><p>Each chapter opens its own conversation. Voice notes stay with the chapter too.</p></div><div class="chapter-section-actions"><button id="openAllMessages" class="secondary-button">View all messages</button>${isAdmin() ? `<button id="setChapters" class="secondary-button">${chapters?.length ? "Edit chapters" : "Add chapters"}</button>` : ""}</div></div>

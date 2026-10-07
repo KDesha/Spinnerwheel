@@ -13,11 +13,12 @@ function check(condition, success, failure) {
   else errors.push(failure);
 }
 
-const [app, packageJson, infoPlist, privacyManifest, xcodeProject] = await Promise.all([
+const [app, packageJson, infoPlist, privacyManifest, privacyPolicy, xcodeProject] = await Promise.all([
   read("app-v2.js"),
   read("package.json"),
   read("ios/App/App/Info.plist"),
   read("ios/App/App/PrivacyInfo.xcprivacy"),
+  read("privacy.html"),
   read("ios/App/App.xcodeproj/project.pbxproj"),
 ]);
 
@@ -30,6 +31,11 @@ check(
   "Replace REVENUECAT_IOS_API_KEY with the iOS public SDK key from RevenueCat"
 );
 check(packageJson.includes('"@supabase/supabase-js"'), "Supabase client is a pinned app dependency", "Supabase client dependency is missing");
+check(packageJson.includes('"@capacitor-community/admob"'), "AdMob is a pinned app dependency", "AdMob dependency is missing");
+check(infoPlist.includes("ca-app-pub-5084669394228535~2467494547"), "AdMob iOS app ID is configured", "AdMob iOS app ID is missing from Info.plist");
+check(app.includes("ca-app-pub-5084669394228535/7336446333"), "Production banner unit is configured", "Production AdMob banner unit is missing");
+check(app.includes("npa: true"), "Banner requests are non-personalized", "AdMob banner requests must explicitly set npa: true");
+check(privacyPolicy.includes("Google AdMob"), "Privacy policy discloses Google AdMob", "Privacy policy does not disclose Google AdMob");
 check(infoPlist.includes("NSMicrophoneUsageDescription"), "Microphone usage text is present", "NSMicrophoneUsageDescription is missing");
 check(infoPlist.includes("ITSAppUsesNonExemptEncryption"), "Export-compliance declaration is present", "ITSAppUsesNonExemptEncryption is missing");
 check(privacyManifest.includes("NSPrivacyCollectedDataTypeEmailAddress"), "App privacy manifest declares account data", "App privacy manifest is incomplete");
@@ -66,6 +72,7 @@ try {
 warnings.push("Deploy both Supabase migrations and all three Edge Functions before review.");
 warnings.push("Set the GOOGLE_BOOKS_API_KEY Edge Function secret to a newly rotated key restricted to the Books API.");
 warnings.push("Confirm App Store Connect privacy answers match ios/App/App/PrivacyInfo.xcprivacy and privacy.html.");
+warnings.push("Confirm the dedicated Spines & Spins European regulations message is active in AdMob before review.");
 warnings.push("Provide App Review with a working demo account and keep the backend online during review.");
 
 for (const item of passes) console.log(`✓ ${item}`);

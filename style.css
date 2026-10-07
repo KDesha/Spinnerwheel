@@ -8,6 +8,7 @@
   --shadow: 0 28px 80px rgba(0,0,0,.42);
   --glass: rgba(31, 18, 14, .66);
   --line: rgba(255,239,210,.26);
+  --admob-banner-height: 0px;
 }
 
 * {
@@ -1217,6 +1218,8 @@ select:focus {
 .nav-link { min-height:38px; padding:8px 13px; border-radius:999px; color:var(--cream); background:rgba(255,242,221,.09); border:1px solid rgba(255,242,221,.2); font-weight:800; }
 .app-shell { width:min(1240px,100%); margin:0 auto; padding:92px clamp(16px,4vw,42px) 44px; }
 .app-shell > .status-pill { position:fixed; right:18px; bottom:16px; z-index:70; margin:0; max-width:min(370px,calc(100vw - 36px)); }
+body.admob-banner-visible .app-shell { padding-bottom:calc(44px + var(--admob-banner-height) + env(safe-area-inset-bottom)); }
+body.admob-banner-visible .app-shell > .status-pill { bottom:calc(16px + var(--admob-banner-height) + env(safe-area-inset-bottom)); }
 .status-pill.warning { color:#ffd9c7; border-color:rgba(255,157,104,.45); }
 .glass-panel { border:1px solid rgba(255,239,210,.28); border-radius:30px; background:rgba(21,11,8,.54); box-shadow:var(--shadow); backdrop-filter:blur(15px); }
 .club-hero { display:flex; align-items:center; justify-content:space-between; gap:28px; padding:clamp(24px,5vw,48px); min-height:250px; background:radial-gradient(circle at 86% 18%,rgba(216,169,77,.24),transparent 26%),radial-gradient(circle at 12% 90%,rgba(146,83,139,.24),transparent 34%),rgba(21,11,8,.54); }
@@ -1286,6 +1289,7 @@ textarea:focus { border-color:var(--gold); }
 .chapter-number { display:grid; place-items:center; width:37px; height:37px; border-radius:50%; color:#31150e; background:linear-gradient(135deg,#fbe6ad,#d29648); font-family:Georgia,serif; font-weight:900; }
 .chapter-card strong,.chapter-card small { display:block; }.chapter-card small{color:rgba(255,242,221,.68);margin-top:3px}.chapter-arrow{margin-left:auto;color:#ffe0a5;font-size:1.3rem}.chapter-dialog{width:min(760px,calc(100vw - 24px))}.message-thread{display:grid;gap:10px;max-height:45vh;overflow:auto;margin:12px 0 16px}.chapter-message{padding:12px 14px;border:1px solid rgba(255,239,210,.14);border-radius:15px;background:rgba(255,255,255,.07)}.chapter-message header{display:flex;justify-content:space-between;gap:12px}.chapter-message small{color:rgba(255,242,221,.58);font-size:.75rem}.chapter-message p{margin:8px 0 0;color:rgba(255,242,221,.88);line-height:1.52}.chapter-message audio{width:100%;margin-top:10px}.read-book-row{color:var(--cream);text-decoration:none}.read-book-row:hover{background:rgba(255,255,255,.14)}
 @media (max-width:760px){.app-nav{padding:12px 15px}.brand-mark{font-size:.95rem}.nav-link{padding:7px 10px;font-size:.82rem}.app-shell{padding:80px 15px 30px}.club-hero,.club-topbar,.book-room{display:block}.club-hero-buttons,.club-top-actions{justify-content:flex-start;margin-top:18px}.club-topbar h1{font-size:2.3rem}.book-cover-area{margin-bottom:22px}.book-cover-area img,.book-cover-placeholder{width:155px}.book-search-row{display:grid;grid-template-columns:1fr}.genre-room .stage-card{padding:18px}.genre-room{border-radius:22px}.section-heading{align-items:start;flex-direction:column}.featured-book{align-items:flex-start}.featured-book img,.featured-book .cover-placeholder{width:58px;height:84px}.chapter-list{grid-template-columns:1fr}}
+@media (max-width:760px){body.admob-banner-visible .app-shell{padding-bottom:calc(30px + var(--admob-banner-height) + env(safe-area-inset-bottom));}}
 
 /* v3 genre shelves, membership choices, and account recovery */
 .wide-dialog { max-width: 920px; }

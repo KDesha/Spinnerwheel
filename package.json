@@ -1,6 +1,6 @@
 {
   "name": "spines-and-spins",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "A whimsical book-club spinner for iOS and Android.",
   "scripts": {
@@ -13,6 +13,7 @@
     "run:ios": "npm run sync:ios && npx cap run ios"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.2.0",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",

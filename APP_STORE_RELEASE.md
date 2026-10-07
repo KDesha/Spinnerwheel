@@ -1,6 +1,6 @@
 # Spines & Spins App Store release
 
-Version 1.0.1 build 5 is currently Ready for Distribution. The October 2026 membership, reading-room, poll, message-deletion, and interaction-reliability update was submitted as version 1.0.2 build 6 and is Waiting for Review.
+Version 1.0.2 build 6 is currently Ready for Distribution. The October 7, 2026 AdMob update was compiled, archived, App Store-signed, validated, and uploaded as version 1.0.3 build 7. It is processing in App Store Connect and has not yet been submitted for review.
 
 The app code, iOS shell, cloud services, store metadata, subscriptions, privacy screens, account deletion flow, and community-safety controls are prepared. Version 1.0 build 3 was compiled, archived, App Store-signed, uploaded, processed, and attached to the App Store version on August 15, 2026. It includes the matched whole/genre library layout, cleaner interface copy, and the new burgundy-and-gold circle-of-books icon. Its Apple Distribution certificate and matching App Store provisioning profile are installed and valid through August 15, 2027.
 
@@ -55,18 +55,18 @@ The support and marketing URLs are saved on version 1.0, and the privacy-policy 
 
 - Bundle ID: `com.kayladeshasier.spinesandspins`
 - Apple app ID: `6797096355`
-- Current App Store version: `1.0.1` build `5`
-- Submitted release: `1.0.2` build `6` — Waiting for Review
+- Current App Store version: `1.0.2` build `6`
+- Uploaded release: `1.0.3` build `7` — Processing; not submitted
 - App icon: `app-store-assets/app-icon-1024.png` (1024×1024 RGB, no transparency), bundled through the iOS AppIcon asset catalog.
 - Export compliance: the app declares that it does not use non-exempt encryption.
 - Age rating: answer for user-generated content and unrestricted web links accurately; do not place the app in the Kids category.
-- App Privacy is published. It discloses email address, name, user ID, emails/text messages, other user content, audio data, purchase history, and product interaction as linked to the user for app functionality; no tracking and no advertising.
+- App Privacy is published for the current release. Before submitting 1.0.3, add Google Mobile Ads disclosures for IP-derived coarse location, device ID, advertising data, product interaction, crash data, and performance data. The implementation requests only non-personalized ads and does not request ATT authorization, so tracking remains No.
 - Review notes should explain Google Books/Open Library metadata, optional plain Amazon search, microphone use only for user-initiated voice notes, report/block controls, account deletion, subscriptions, and Restore Purchases.
 - A durable demo account is confirmed and populated with a private review club, The Hobbit, 19 chapters, a current reading room, and a sample chapter warning/rating. Its credentials are saved in App Store Connect.
 - The app is set to Free, public distribution in 174 countries or regions, and manual release after approval. China mainland is excluded; App Store Connect shows its removal as processing.
 - Content Rights is complete with the account holder's attestation that the app has the necessary rights to access its third-party content.
 - App Review submission `9803b2e0-240b-4f89-adc1-b4abe24c26f3` includes five items: iOS version 1.0 build 3, the Spines & Spins Membership subscription group, and all three monthly subscriptions. Every item is **Waiting for Review** as of August 16, 2026.
-- The October 6, 2026 submission contains three items: iOS version 1.0.2 build 6 plus the updated Story Spinner and Shelf Enchanter subscription descriptions. App Store Connect reports **Waiting for Review** and keeps manual release enabled.
+- The October 6, 2026 submission contained three items: iOS version 1.0.2 build 6 plus the updated Story Spinner and Shelf Enchanter subscription descriptions. That version is now Ready for Distribution. Version 1.0.3 build 7 adds the Google Mobile Ads SDK and UMP consent handling for First Chapter members only; see `app-store-assets/version-1.0.3-metadata.md`.
 
 ## 6. Final commands
 
@@ -76,6 +76,6 @@ npm run release:check
 npm run sync:ios
 ```
 
-These checks passed for version 1.0.2 build 6, including the Release simulator build, device archive, Apple Distribution export, App Store Connect validation and upload, and build processing. Build 6 is attached to version 1.0.2 and submitted with the two updated paid-tier descriptions. The release remains manual, so approval will not publish the app until the account holder chooses to release it.
+These checks passed for version 1.0.3 build 7, including the native test banner, Release device archive, Apple Distribution export, App Store Connect validation, and upload. Apple reported non-blocking missing-dSYM warnings for the static GoogleMobileAds and UserMessagingPlatform frameworks. Build 7 still needs processing, updated App Privacy answers, attachment to version 1.0.3, and final review submission. The release should remain manual.
 
 Amazon Associates is not required. The app intentionally generates a normal Amazon search URL without an affiliate tag and does not claim an affiliate relationship.
